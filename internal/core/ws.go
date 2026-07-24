@@ -38,15 +38,13 @@ type Hub struct {
 	Logout    chan *Client
 }
 
-var hub = Hub{
-	Broadcast: make(chan Event),
-	Servers:   make(map[int64]map[*Client]struct{}),
-	Login:     make(chan *Client),
-	Logout:    make(chan *Client),
-}
-
-func GetHub() *Hub {
-	return &hub
+func NewHub() *Hub {
+	return &Hub{
+		Broadcast: make(chan Event),
+		Servers:   make(map[int64]map[*Client]struct{}),
+		Login:     make(chan *Client),
+		Logout:    make(chan *Client),
+	}
 }
 
 func (h *Hub) Run() {
@@ -93,24 +91,25 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func (s *Server) HandleWebSocket(c echo.Context) error {
-	UserID := c.Get("user_id").(int64)
-
-	serverIDs, err := s.Q.GetUserServersIDs(c.Request().Context(), UserID)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Failed to load servers")
+func (s *Server) HandleWebSocket(h *Hub) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		UserID := c.Get("user_id").(int64)
+		serverIDs, err := s.Q.GetUserServersIDs(c.Request().Context(), UserID)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "Failed to load servers")
+		}
+		conn, err := upgrader.Upgrade(c.Response().Writer, c.Request(), nil)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "Failed to upgrade connection")
+		}
+		client := &Client{
+			Conn:      conn,
+			UserID:    UserID,
+			ServerIDs: serverIDs,
+			Send:      make(chan Event),
+		}
+		h.Login <- client
+		go client.WritePump()
+		return nil
 	}
-	conn, err := upgrader.Upgrade(c.Response().Writer, c.Request(), nil)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Failed to upgrade connection")
-	}
-	client := &Client{
-		Conn:      conn,
-		UserID:    UserID,
-		ServerIDs: serverIDs,
-		Send:      make(chan Event),
-	}
-	hub.Login <- client
-	go client.WritePump()
-	return nil
 }

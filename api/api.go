@@ -1,9 +1,6 @@
 package api
 
 import (
-	"net/http"
-	"strconv"
-
 	"gocord/db/query"
 	"gocord/internal/core"
 
@@ -16,6 +13,7 @@ type Handler struct {
 	Q      *query.Queries
 	Flake  *snowflake.Node
 	Secret []byte
+	Hub    *core.Hub
 }
 
 func (h *Handler) Route(e *echo.Echo) {
@@ -28,21 +26,6 @@ func (h *Handler) Route(e *echo.Echo) {
 		SigningKey: h.Secret,
 	}))
 	servers.Use(core.AuthMiddleware)
-	servers.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			serverIDStr := c.Param("server")
-			if serverIDStr == "" {
-				return echo.NewHTTPError(http.StatusBadRequest, "server id required")
-			}
-			serverID, err := strconv.ParseInt(serverIDStr, 10, 64)
-			if err != nil {
-				return echo.NewHTTPError(http.StatusBadRequest, "invalid server id")
-			}
-
-			c.Set("server_id", serverID)
-			return next(c)
-		}
-	})
 	servers.GET("/messages/:offset", h.GetMessages)
 	servers.DELETE("/messages/:message", h.DeleteMessage)
 	servers.POST("/messages", h.PostMessage)
