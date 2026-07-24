@@ -2,44 +2,43 @@ package api
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"gocord/db/query"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v4"
 	"github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
+	"gocord/db/query"
 )
 
 type AuthResponse struct {
 	Token string `json:"token"`
 }
 
-func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Register(c echo.Context) error {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 	req.Username = strings.TrimSpace(req.Username)
 	if req.Username == "" || req.Password == "" {
-		http.Error(w, "username and password required", http.StatusBadRequest)
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, "username and password required")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 	}
 
 	id := h.Flake.Generate().Int64()
-	if err = h.Q.CreateUser(r.Context(), query.CreateUserParams{
+	if err = h.Q.CreateUser(c.Request().Context(), query.CreateUserParams{
 		ID:           id,
 		Username:     req.Username,
 		Display:      req.Username,
@@ -47,54 +46,52 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		if extErr, ok := errors.AsType[*sqlite3.Error](err); ok {
 			if extErr.ExtendedCode == sqlite3.ErrConstraintUnique || extErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
-				http.Error(w, "Username already taken", http.StatusConflict)
-				return
+				return echo.NewHTTPError(http.StatusConflict, "Username already taken")
 			}
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	_, token, err := h.TokenAuth.Encode(map[string]any{
+	claims := jwt.MapClaims{
 		"user_id": strconv.FormatInt(id, 10),
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		"exp":     time.Now().Add(72 * time.Hour).Unix(),
 	}
-	json.NewEncoder(w).Encode(AuthResponse{Token: token})
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(h.Secret)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, AuthResponse{Token: tokenString})
 }
 
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Login(c echo.Context) error {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
-	user, err := h.Q.GetUserByUsername(r.Context(), req.Username)
+	user, err := h.Q.GetUserByUsername(c.Request().Context(), req.Username)
 	if errors.Is(err, sql.ErrNoRows) {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
-		return
+		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
 	} else if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
-		return
+		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
 	}
 
-	_, token, err := h.TokenAuth.Encode(map[string]any{
+	claims := jwt.MapClaims{
 		"user_id": strconv.FormatInt(user.ID, 10),
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		"exp":     time.Now().Add(72 * time.Hour).Unix(),
 	}
-	json.NewEncoder(w).Encode(AuthResponse{Token: token})
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(h.Secret)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, AuthResponse{Token: tokenString})
 }

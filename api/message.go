@@ -2,65 +2,54 @@ package api
 
 import (
 	"database/sql"
-	"encoding/json"
-	"gocord/db/query"
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/labstack/echo/v4"
+	"gocord/db/query"
 )
 
-// /api/{server}/messages/{offset}, GET; limit of 20
-func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
-	UserID := r.Context().Value("user_id").(int64)
-	ServerID := r.Context().Value("server_id").(int64)
-	Offset, err := strconv.ParseInt(chi.URLParam(r, "offset"), 10, 64)
+func (h *Handler) GetMessages(c echo.Context) error {
+	UserID := c.Get("user_id").(int64)
+	ServerID := c.Get("server_id").(int64)
+	Offset, err := strconv.ParseInt(c.Param("offset"), 10, 64)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	if ok, err := h.Q.UserInServer(r.Context(), query.UserInServerParams{
+	if ok, err := h.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: ServerID,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	} else if !ok {
-		http.Error(w, "user not in server", http.StatusForbidden)
-		return
+		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
-	messages, err := h.Q.GetServerMessages(r.Context(), query.GetServerMessagesParams{
+	messages, err := h.Q.GetServerMessages(c.Request().Context(), query.GetServerMessagesParams{
 		ServerID: ServerID,
 		Limit:    20,
 		Offset:   Offset,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	if len(messages) == 0 {
-		w.WriteHeader(http.StatusNoContent)
-		return
+		return c.NoContent(http.StatusNoContent)
 	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(messages)
+	return c.JSON(http.StatusOK, messages)
 }
 
-// /api/{server}/messages/, POST
-func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
-	UserID := r.Context().Value("user_id").(int64)
-	ServerID := r.Context().Value("server_id").(int64)
-	if ok, err := h.Q.UserInServer(r.Context(), query.UserInServerParams{
+func (h *Handler) PostMessage(c echo.Context) error {
+	UserID := c.Get("user_id").(int64)
+	ServerID := c.Get("server_id").(int64)
+	if ok, err := h.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: ServerID,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	} else if !ok {
-		http.Error(w, "user not in server", http.StatusForbidden)
-		return
+		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
 	var req struct {
@@ -68,12 +57,11 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		ReplyTo *int64 `json:"reply_to,omitempty,string"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	if err := h.Q.CreateMessage(r.Context(), query.CreateMessageParams{
+	if err := h.Q.CreateMessage(c.Request().Context(), query.CreateMessageParams{
 		ID:       h.Flake.Generate().Int64(),
 		ServerID: ServerID,
 		UserID:   UserID,
@@ -81,39 +69,32 @@ func (h *Handler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		ReplyTo:  sql.NullInt64{Int64: *req.ReplyTo, Valid: req.ReplyTo != nil},
 		IsReply:  req.ReplyTo != nil,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	w.WriteHeader(http.StatusOK)
+	return c.NoContent(http.StatusOK)
 }
 
-// /api/{server}/messages/{message}, DELETE
-func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
-	ServerID := r.Context().Value("server_id").(int64)
-	UserID := r.Context().Value("user_id").(int64)
-	MessageID, err := strconv.ParseInt(chi.URLParam(r, "message"), 10, 64)
+func (h *Handler) DeleteMessage(c echo.Context) error {
+	ServerID := c.Get("server_id").(int64)
+	UserID := c.Get("user_id").(int64)
+	MessageID, err := strconv.ParseInt(c.Param("message"), 10, 64)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	if ok, err := h.Q.UserInServer(r.Context(), query.UserInServerParams{
+	if ok, err := h.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: ServerID,
 	}); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	} else if !ok {
-		http.Error(w, "user not in server", http.StatusForbidden)
-		return
+		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
-	if n, err := h.Q.DeleteMessage(r.Context(), MessageID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if n, err := h.Q.DeleteMessage(c.Request().Context(), MessageID); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	} else if n == 0 {
-		http.Error(w, "you are not authorized or message not found", http.StatusNotFound)
-		return
+		return echo.NewHTTPError(http.StatusNotFound, "you are not authorized or message not found")
 	}
-	w.WriteHeader(http.StatusOK)
+	return c.NoContent(http.StatusOK)
 }

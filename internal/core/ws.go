@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/labstack/echo/v4"
 )
 
 type Event struct {
@@ -92,22 +93,16 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	UserID, err, status := GetUserIDFromRequest(r)
-	if err != nil {
-		http.Error(w, err.Error(), status)
-		return
-	}
+func (s *Server) HandleWebSocket(c echo.Context) error {
+	UserID := c.Get("user_id").(int64)
 
-	serverIDs, err := s.Q.GetUserServersIDs(r.Context(), UserID)
+	serverIDs, err := s.Q.GetUserServersIDs(c.Request().Context(), UserID)
 	if err != nil {
-		http.Error(w, "Failed to load servers", http.StatusInternalServerError)
-		return
+		return c.String(http.StatusInternalServerError, "Failed to load servers")
 	}
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(c.Response().Writer, c.Request(), nil)
 	if err != nil {
-		http.Error(w, "Failed to upgrade connection", http.StatusInternalServerError)
-		return
+		return c.String(http.StatusInternalServerError, "Failed to upgrade connection")
 	}
 	client := &Client{
 		Conn:      conn,
@@ -117,4 +112,5 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	hub.Login <- client
 	go client.WritePump()
+	return nil
 }

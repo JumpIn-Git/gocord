@@ -3,14 +3,14 @@ package core
 import (
 	"context"
 	"database/sql"
-	"gocord/db/query"
 
 	"github.com/bwmarrin/snowflake"
-	"github.com/go-chi/chi/v5"
+	"github.com/labstack/echo/v4"
+	"gocord/db/query"
 )
 
 type Server struct {
-	*chi.Mux
+	*echo.Echo
 	Q     *query.Queries
 	Flake *snowflake.Node
 	context.Context
@@ -23,7 +23,7 @@ func NewServer(db *sql.DB, secret []byte) (*Server, error) {
 		return nil, err
 	}
 	return &Server{
-		Mux:     chi.NewRouter(),
+		Echo:    echo.New(),
 		Q:       query.New(db),
 		Flake:   flake,
 		Context: context.Background(),
