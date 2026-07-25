@@ -11,16 +11,8 @@ import (
 )
 
 const createMessage = `-- name: CreateMessage :exec
-INSERT INTO messages(
-  id,
-  server_id,
-  user_id,
-  content,
-  reply_to,
-  is_reply
-)
-VALUES
-  (?, ?, ?, ?, ?, ?)
+INSERT INTO messages(id, server_id, user_id, content, reply_to, is_reply)
+VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type CreateMessageParams struct {
@@ -46,12 +38,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 }
 
 const createReaction = `-- name: CreateReaction :exec
-INSERT INTO message_reactions(
-  message_id,
-  user_id,
-  emoji
-)
-VALUES (?, ?, ?)
+INSERT INTO message_reactions(message_id, user_id, emoji) VALUES (?, ?, ?)
 `
 
 type CreateReactionParams struct {
@@ -67,12 +54,7 @@ func (q *Queries) CreateReaction(ctx context.Context, arg CreateReactionParams) 
 }
 
 const createServer = `-- name: CreateServer :exec
-INSERT INTO servers(
-  id,
-  name,
-  owner
-)
-VALUES (?, ?, ?)
+INSERT INTO servers(id, name, owner) VALUES (?, ?, ?)
 `
 
 type CreateServerParams struct {
@@ -88,13 +70,7 @@ func (q *Queries) CreateServer(ctx context.Context, arg CreateServerParams) erro
 }
 
 const createUser = `-- name: CreateUser :exec
-INSERT INTO users(
-  id,
-  username,
-  display,
-  password_hash
-)
-VALUES (?, ?, ?, ?)
+INSERT INTO users(id, username, display, password_hash) VALUES (?, ?, ?, ?)
 `
 
 type CreateUserParams struct {
@@ -118,11 +94,35 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 const deleteMessage = `-- name: DeleteMessage :execrows
 DELETE FROM messages
 WHERE
-  id = ?
+  messages.id = ?1
+  AND (user_id = ?2 OR server_id IN (SELECT id FROM servers WHERE owner = ?2))
 `
 
-func (q *Queries) DeleteMessage(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteMessage, id)
+type DeleteMessageParams struct {
+	ID     int64
+	UserID int64
+}
+
+func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteMessage, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteReaction = `-- name: DeleteReaction :execrows
+DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?
+`
+
+type DeleteReactionParams struct {
+	MessageID int64
+	UserID    int64
+	Emoji     string
+}
+
+func (q *Queries) DeleteReaction(ctx context.Context, arg DeleteReactionParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteReaction, arg.MessageID, arg.UserID, arg.Emoji)
 	if err != nil {
 		return 0, err
 	}
@@ -130,9 +130,7 @@ func (q *Queries) DeleteMessage(ctx context.Context, id int64) (int64, error) {
 }
 
 const deleteServer = `-- name: DeleteServer :exec
-DELETE FROM servers
-WHERE
-  id = ?
+DELETE FROM servers WHERE id = ?
 `
 
 func (q *Queries) DeleteServer(ctx context.Context, id int64) error {
@@ -143,10 +141,8 @@ func (q *Queries) DeleteServer(ctx context.Context, id int64) error {
 const deleteUser = `-- name: DeleteUser :exec
 UPDATE users
 SET
-  username = 'Deleted User '
-  || id,
-  display = 'Deleted User '
-  || id,
+  username = 'Deleted User ' || id,
+  display = 'Deleted User ' || id,
   password_hash = '',
   is_deleted = 1
 WHERE
@@ -160,12 +156,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 }
 
 const editMessage = `-- name: EditMessage :exec
-UPDATE messages
-SET
-  content = ?,
-  is_edited = 1
-WHERE
-  id = ?
+UPDATE messages SET content = ?, is_edited = 1 WHERE id = ?
 `
 
 type EditMessageParams struct {
@@ -179,10 +170,7 @@ func (q *Queries) EditMessage(ctx context.Context, arg EditMessageParams) error 
 }
 
 const getMessageReactions = `-- name: GetMessageReactions :many
-SELECT message_id, user_id, emoji
-FROM message_reactions
-WHERE
-  message_id = ?
+SELECT message_id, user_id, emoji FROM message_reactions WHERE message_id = ?
 `
 
 func (q *Queries) GetMessageReactions(ctx context.Context, messageID int64) ([]MessageReaction, error) {
@@ -209,10 +197,7 @@ func (q *Queries) GetMessageReactions(ctx context.Context, messageID int64) ([]M
 }
 
 const getServerMemberCount = `-- name: GetServerMemberCount :one
-SELECT COUNT(*)
-FROM server_members
-WHERE
-  server_id = ?
+SELECT COUNT(*) FROM server_members WHERE server_id = ?
 `
 
 func (q *Queries) GetServerMemberCount(ctx context.Context, serverID int64) (int64, error) {
@@ -223,11 +208,7 @@ func (q *Queries) GetServerMemberCount(ctx context.Context, serverID int64) (int
 }
 
 const getServerMembers = `-- name: GetServerMembers :many
-SELECT server_id, user_id, server_display
-FROM server_members
-WHERE
-  server_id = ?
-LIMIT ? OFFSET ?
+SELECT server_id, user_id, server_display FROM server_members WHERE server_id = ? LIMIT ? OFFSET ?
 `
 
 type GetServerMembersParams struct {
@@ -260,11 +241,7 @@ func (q *Queries) GetServerMembers(ctx context.Context, arg GetServerMembersPara
 }
 
 const getServerMessage = `-- name: GetServerMessage :one
-SELECT id, server_id, user_id, content, reply_to, is_reply, is_edited, time
-FROM messages
-WHERE
-  server_id = ?
-  AND id = ?
+SELECT id, server_id, user_id, content, reply_to, is_reply, is_edited, time FROM messages WHERE server_id = ? AND id = ?
 `
 
 type GetServerMessageParams struct {
@@ -289,13 +266,7 @@ func (q *Queries) GetServerMessage(ctx context.Context, arg GetServerMessagePara
 }
 
 const getServerMessages = `-- name: GetServerMessages :many
-SELECT id, server_id, user_id, content, reply_to, is_reply, is_edited, time
-FROM messages
-WHERE
-  server_id = ?
-ORDER BY
-  id
-LIMIT ? OFFSET ?
+SELECT id, server_id, user_id, content, reply_to, is_reply, is_edited, time FROM messages WHERE server_id = ? ORDER BY id LIMIT ? OFFSET ?
 `
 
 type GetServerMessagesParams struct {
@@ -337,11 +308,7 @@ func (q *Queries) GetServerMessages(ctx context.Context, arg GetServerMessagesPa
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, display, password_hash, joined_at, is_deleted
-FROM users
-WHERE
-  username = ?
-  AND is_deleted = 0
+SELECT id, username, display, password_hash, joined_at, is_deleted FROM users WHERE username = ? AND is_deleted = 0
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -359,10 +326,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getUserServersIDs = `-- name: GetUserServersIDs :many
-SELECT server_id
-FROM server_members
-WHERE
-  user_id = ?
+SELECT server_id FROM server_members WHERE user_id = ?
 `
 
 func (q *Queries) GetUserServersIDs(ctx context.Context, userID int64) ([]int64, error) {
@@ -389,11 +353,7 @@ func (q *Queries) GetUserServersIDs(ctx context.Context, userID int64) ([]int64,
 }
 
 const joinServer = `-- name: JoinServer :exec
-INSERT INTO server_members(
-  user_id,
-  server_id
-)
-VALUES (?, ?)
+INSERT INTO server_members(user_id, server_id) VALUES (?, ?)
 `
 
 type JoinServerParams struct {
@@ -407,10 +367,7 @@ func (q *Queries) JoinServer(ctx context.Context, arg JoinServerParams) error {
 }
 
 const leaveServer = `-- name: LeaveServer :exec
-DELETE FROM server_members
-WHERE
-  user_id = ?
-  AND server_id = ?
+DELETE FROM server_members WHERE user_id = ? AND server_id = ?
 `
 
 type LeaveServerParams struct {
@@ -424,15 +381,7 @@ func (q *Queries) LeaveServer(ctx context.Context, arg LeaveServerParams) error 
 }
 
 const userInServer = `-- name: UserInServer :one
-SELECT
-  EXISTS (
-    SELECT 1
-    FROM server_members
-    WHERE
-      user_id = ?
-      AND server_id
-      = ?
-  )
+SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ?)
 `
 
 type UserInServerParams struct {

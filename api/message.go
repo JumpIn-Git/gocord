@@ -23,7 +23,7 @@ func (h *Handler) GetMessages(c echo.Context) error {
 		return err
 	}
 
-	if ok, err := h.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
+	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: req.Server,
 	}); err != nil {
@@ -32,7 +32,7 @@ func (h *Handler) GetMessages(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
-	messages, err := h.Q.GetServerMessages(c.Request().Context(), query.GetServerMessagesParams{
+	messages, err := h.Srv.Q.GetServerMessages(c.Request().Context(), query.GetServerMessagesParams{
 		ServerID: req.Server,
 		Limit:    20,
 		Offset:   req.Offset,
@@ -56,7 +56,7 @@ func (h *Handler) PostMessage(c echo.Context) error {
 		return err
 	}
 
-	if ok, err := h.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
+	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: params.Server,
 	}); err != nil {
@@ -74,8 +74,8 @@ func (h *Handler) PostMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	if err := h.Q.CreateMessage(c.Request().Context(), query.CreateMessageParams{
-		ID:       h.Flake.Generate().Int64(),
+	if err := h.Srv.Q.CreateMessage(c.Request().Context(), query.CreateMessageParams{
+		ID:       h.Srv.Flake.Generate().Int64(),
 		ServerID: params.Server,
 		UserID:   UserID,
 		Content:  req.Content,
@@ -85,7 +85,7 @@ func (h *Handler) PostMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	h.Hub.Broadcast <- core.Event{
+	h.Srv.Hub.Broadcast <- core.Event{
 		Type:     "new_msg",
 		ServerID: params.Server,
 		Payload:  req,
@@ -103,7 +103,7 @@ func (h *Handler) DeleteMessage(c echo.Context) error {
 		return err
 	}
 
-	if ok, err := h.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
+	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: req.Server,
 	}); err != nil {
@@ -112,12 +112,15 @@ func (h *Handler) DeleteMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
-	if n, err := h.Q.DeleteMessage(c.Request().Context(), req.MessageID); err != nil {
+	if n, err := h.Srv.Q.DeleteMessage(c.Request().Context(), query.DeleteMessageParams{
+		ID:     req.MessageID,
+		UserID: UserID,
+	}); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	} else if n == 0 {
 		return echo.NewHTTPError(http.StatusNotFound, "you are not authorized or message not found")
 	}
-	h.Hub.Broadcast <- core.Event{
+	h.Srv.Hub.Broadcast <- core.Event{
 		Type:     "del_msg",
 		ServerID: req.Server,
 		Payload:  req.MessageID,

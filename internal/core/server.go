@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 
+	"gocord/db/query"
+
 	"github.com/bwmarrin/snowflake"
 	"github.com/labstack/echo/v4"
-	"gocord/db/query"
 )
 
 type Server struct {
@@ -15,10 +16,11 @@ type Server struct {
 	Flake *snowflake.Node
 	context.Context
 	secret []byte
+	Hub    *Hub
 }
 
-func NewServer(db *sql.DB, secret []byte) (*Server, error) {
-	flake, err := snowflake.NewNode(1)
+func NewServer(db *sql.DB, secret []byte, flakeInt int64) (*Server, error) {
+	flake, err := snowflake.NewNode(flakeInt)
 	if err != nil {
 		return nil, err
 	}
@@ -28,5 +30,6 @@ func NewServer(db *sql.DB, secret []byte) (*Server, error) {
 		Flake:   flake,
 		Context: context.Background(),
 		secret:  secret,
+		Hub:     NewHub(),
 	}, nil
 }

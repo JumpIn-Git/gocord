@@ -4,20 +4,15 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"gocord/db/query"
+
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
-	"gocord/db/query"
 )
-
-type AuthResponse struct {
-	Token string `json:"token"`
-}
 
 func (h *Handler) Register(c echo.Context) error {
 	var req struct {
@@ -31,14 +26,17 @@ func (h *Handler) Register(c echo.Context) error {
 	if req.Username == "" || req.Password == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "username and password required")
 	}
+	if len(req.Username) > 32 || len(req.Password) > 32 {
+		return echo.NewHTTPError(http.StatusBadRequest, "username and password must be 32 characters or less")
+	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
+		return echo.ErrInternalServerError
 	}
 
-	id := h.Flake.Generate().Int64()
-	if err = h.Q.CreateUser(c.Request().Context(), query.CreateUserParams{
+	id := h.Srv.Flake.Generate().Int64()
+	if err = h.Srv.Q.CreateUser(c.Request().Context(), query.CreateUserParams{
 		ID:           id,
 		Username:     req.Username,
 		Display:      req.Username,
@@ -52,16 +50,19 @@ func (h *Handler) Register(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	claims := jwt.MapClaims{
-		"user_id": strconv.FormatInt(id, 10),
-		"exp":     time.Now().Add(72 * time.Hour).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(h.Secret)
+	sess, err := session.Get("gocord", c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusOK, AuthResponse{Token: tokenString})
+	sess.Values["user_id"] = id
+	if err := sess.Save(c.Request(), c.Response()); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"user_id":  id,
+		"username": req.Username,
+	})
 }
 
 func (h *Handler) Login(c echo.Context) error {
@@ -73,7 +74,7 @@ func (h *Handler) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
-	user, err := h.Q.GetUserByUsername(c.Request().Context(), req.Username)
+	user, err := h.Srv.Q.GetUserByUsername(c.Request().Context(), req.Username)
 	if errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
 	} else if err != nil {
@@ -84,14 +85,17 @@ func (h *Handler) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
 	}
 
-	claims := jwt.MapClaims{
-		"user_id": strconv.FormatInt(user.ID, 10),
-		"exp":     time.Now().Add(72 * time.Hour).Unix(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(h.Secret)
+	sess, err := session.Get("gocord", c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusOK, AuthResponse{Token: tokenString})
+	sess.Values["user_id"] = user.ID
+	if err := sess.Save(c.Request(), c.Response()); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"user_id":  user.ID,
+		"username": user.Username,
+	})
 }
