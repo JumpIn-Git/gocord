@@ -219,7 +219,7 @@ func (q *Queries) GetServerMemberCount(ctx context.Context, serverID int64) (int
 }
 
 const getServerMembers = `-- name: GetServerMembers :many
-SELECT server_id, user_id, server_display FROM server_members WHERE server_id = ? LIMIT ? OFFSET ?
+SELECT server_id, user_id, is_ban, server_display FROM server_members WHERE server_id = ? LIMIT ? OFFSET ?
 `
 
 type GetServerMembersParams struct {
@@ -237,7 +237,12 @@ func (q *Queries) GetServerMembers(ctx context.Context, arg GetServerMembersPara
 	var items []ServerMember
 	for rows.Next() {
 		var i ServerMember
-		if err := rows.Scan(&i.ServerID, &i.UserID, &i.ServerDisplay); err != nil {
+		if err := rows.Scan(
+			&i.ServerID,
+			&i.UserID,
+			&i.IsBan,
+			&i.ServerDisplay,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

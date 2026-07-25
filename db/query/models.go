@@ -33,7 +33,7 @@ type Server struct {
 }
 
 type ServerInvite struct {
-	ID        int64
+	ID        interface{}
 	ServerID  int64
 	UserID    int64
 	ExpiresAt time.Time
@@ -42,6 +42,7 @@ type ServerInvite struct {
 type ServerMember struct {
 	ServerID      int64
 	UserID        int64
+	IsBan         bool
 	ServerDisplay sql.NullString
 }
 

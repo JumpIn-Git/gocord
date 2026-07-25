@@ -19,6 +19,7 @@ CREATE TABLE servers (
 CREATE TABLE server_members (
   server_id INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
+  is_ban BOOLEAN NOT NULL DEFAULT 0, -- track bans
   server_display TEXT, -- optional server-only display
   PRIMARY KEY (server_id, user_id),
   -- If server is deleted, wipe its memberships
@@ -27,7 +28,7 @@ CREATE TABLE server_members (
 );
 
 CREATE TABLE server_invites (
-  id INTEGER PRIMARY KEY,
+  id string PRIMARY KEY,
   server_id INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
   expires_at TIMESTAMP NOT NULL,

@@ -75,3 +75,12 @@ DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?
 -- name: DeleteExpiredInvites :exec
 -- Run this periodically to delete expired invites
 DELETE FROM server_invites WHERE expires_at <= datetime('now');
+
+-- name: GetInviteOrExpire :one
+BEGIN;
+
+DELETE FROM server_invites WHERE id = ?1 AND expires_at <= datetime('now');
+
+SELECT * FROM server_invites WHERE id = ?1;
+
+COMMIT;
