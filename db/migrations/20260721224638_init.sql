@@ -5,7 +5,8 @@ CREATE TABLE users (
   display TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  is_deleted BOOLEAN NOT NULL DEFAULT 0
+  is_deleted BOOLEAN NOT NULL DEFAULT 0,
+  cookie_ver INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE servers (
@@ -23,6 +24,15 @@ CREATE TABLE server_members (
   -- If server is deleted, wipe its memberships
   FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE server_invites (
+  id INTEGER PRIMARY KEY,
+  server_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE TABLE messages (

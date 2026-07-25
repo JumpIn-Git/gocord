@@ -70,3 +70,8 @@ SELECT * FROM message_reactions WHERE message_id = ?;
 
 -- name: DeleteReaction :execrows
 DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?;
+
+/* INVITES */
+-- name: DeleteExpiredInvites :exec
+-- Run this periodically to delete expired invites
+DELETE FROM server_invites WHERE expires_at <= datetime('now');

@@ -32,6 +32,13 @@ type Server struct {
 	Owner int64
 }
 
+type ServerInvite struct {
+	ID        int64
+	ServerID  int64
+	UserID    int64
+	ExpiresAt time.Time
+}
+
 type ServerMember struct {
 	ServerID      int64
 	UserID        int64
@@ -45,4 +52,5 @@ type User struct {
 	PasswordHash string
 	JoinedAt     time.Time
 	IsDeleted    bool
+	CookieVer    int64
 }

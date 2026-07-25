@@ -91,6 +91,17 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 	return err
 }
 
+const deleteExpiredInvites = `-- name: DeleteExpiredInvites :exec
+DELETE FROM server_invites WHERE expires_at <= datetime('now')
+`
+
+// INVITES
+// Run this periodically to delete expired invites
+func (q *Queries) DeleteExpiredInvites(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteExpiredInvites)
+	return err
+}
+
 const deleteMessage = `-- name: DeleteMessage :execrows
 DELETE FROM messages
 WHERE
@@ -308,7 +319,7 @@ func (q *Queries) GetServerMessages(ctx context.Context, arg GetServerMessagesPa
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, display, password_hash, joined_at, is_deleted FROM users WHERE username = ? AND is_deleted = 0
+SELECT id, username, display, password_hash, joined_at, is_deleted, cookie_ver FROM users WHERE username = ? AND is_deleted = 0
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -321,6 +332,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.PasswordHash,
 		&i.JoinedAt,
 		&i.IsDeleted,
+		&i.CookieVer,
 	)
 	return i, err
 }
