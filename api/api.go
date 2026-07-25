@@ -15,9 +15,14 @@ func (h *Handler) Route(e *echo.Echo) {
 	api.POST("/auth/register", h.Register)
 	api.POST("/auth/login", h.Login)
 
-	servers := api.Group("/servers/:server")
-	servers.Use(core.AuthMiddleware)
-	servers.GET("/messages/:offset", h.GetMessages)
-	servers.DELETE("/messages/:message", h.DeleteMessage)
-	servers.POST("/messages", h.PostMessage)
+	servers := api.Group("/servers/:server", core.AuthMiddleware)
+
+	messages := servers.Group("/messages")
+	messages.GET("/:offset", h.GetMessages)
+	messages.DELETE("/:message", h.DeleteMessage)
+	messages.POST("/", h.PostMessage)
+
+	reactions := servers.Group("/react")
+	reactions.POST("/:message", h.PostReaction)
+	reactions.DELETE("/:message", h.DeleteReaction)
 }

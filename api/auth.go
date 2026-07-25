@@ -99,3 +99,17 @@ func (h *Handler) Login(c echo.Context) error {
 		"username": user.Username,
 	})
 }
+
+func (h *Handler) Logout(c echo.Context) error {
+	sess, err := session.Get("gocord", c)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	sess.Values = make(map[any]any)
+	sess.Options.MaxAge = -1 // browser will remove the cookie
+	// TODO add cookie_ver to sqlite users to make old cookies useless
+	if err := sess.Save(c.Request(), c.Response()); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, nil)
+}

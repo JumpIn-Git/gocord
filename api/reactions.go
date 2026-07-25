@@ -2,13 +2,14 @@ package api
 
 import (
 	"gocord/db/query"
+	"gocord/internal/core"
 	"net/http"
 
 	"github.com/forPelevin/gomoji"
 	"github.com/labstack/echo/v4"
 )
 
-// /api/{server}/react/{message}
+// /api/{server}/react/{message} POST
 func (h *Handler) PostReaction(c echo.Context) error {
 	UserID := c.Get("user_id").(int64)
 	var req struct {
@@ -39,9 +40,15 @@ func (h *Handler) PostReaction(c echo.Context) error {
 	}); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+	h.Srv.Hub.Broadcast <- core.Event{
+		Type:     "new_reaction",
+		ServerID: req.ServerID,
+		Payload:  req.Emoji,
+	}
 	return c.JSON(http.StatusOK, nil)
 }
 
+// /api/servers/{server}/react/{message} DELETE
 func (h *Handler) DeleteReaction(c echo.Context) error {
 	UserID := c.Get("user_id").(int64)
 	var req struct {
@@ -73,6 +80,11 @@ func (h *Handler) DeleteReaction(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	} else if n == 0 {
 		return echo.NewHTTPError(http.StatusNotFound, "reaction not found")
+	}
+	h.Srv.Hub.Broadcast <- core.Event{
+		Type:     "del_reaction",
+		ServerID: req.ServerID,
+		Payload:  req.Emoji,
 	}
 	return c.JSON(http.StatusOK, nil)
 }
