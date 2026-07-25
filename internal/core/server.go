@@ -15,11 +15,10 @@ type Server struct {
 	Q     *query.Queries
 	Flake *snowflake.Node
 	context.Context
-	secret []byte
-	Hub    *Hub
+	Hub *Hub
 }
 
-func NewServer(db *sql.DB, secret []byte, flakeInt int64) (*Server, error) {
+func NewServer(db *sql.DB, flakeInt int64) (*Server, error) {
 	flake, err := snowflake.NewNode(flakeInt)
 	if err != nil {
 		return nil, err
@@ -29,7 +28,6 @@ func NewServer(db *sql.DB, secret []byte, flakeInt int64) (*Server, error) {
 		Q:       query.New(db),
 		Flake:   flake,
 		Context: context.Background(),
-		secret:  secret,
 		Hub:     NewHub(),
 	}, nil
 }

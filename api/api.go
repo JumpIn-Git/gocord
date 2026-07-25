@@ -16,6 +16,8 @@ func (h *Handler) Route(e *echo.Echo) {
 	api.POST("/auth/login", h.Login)
 
 	servers := api.Group("/servers/:server", core.AuthMiddleware)
+	servers.POST("/join", h.JoinServer)
+	servers.DELETE("/leave", h.LeaveServer)
 
 	messages := servers.Group("/messages")
 	messages.GET("/:offset", h.GetMessages)

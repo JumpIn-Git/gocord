@@ -10,6 +10,21 @@ import (
 	"database/sql"
 )
 
+const createMembership = `-- name: CreateMembership :exec
+INSERT INTO server_members(user_id, server_id) VALUES (?, ?)
+`
+
+type CreateMembershipParams struct {
+	UserID   int64
+	ServerID int64
+}
+
+// MEMBERSHIP
+func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipParams) error {
+	_, err := q.db.ExecContext(ctx, createMembership, arg.UserID, arg.ServerID)
+	return err
+}
+
 const createMessage = `-- name: CreateMessage :exec
 INSERT INTO messages(id, server_id, user_id, content, reply_to, is_reply)
 VALUES (?, ?, ?, ?, ?, ?)
@@ -102,6 +117,15 @@ func (q *Queries) DeleteExpiredInvites(ctx context.Context) error {
 	return err
 }
 
+const deleteInvite = `-- name: DeleteInvite :exec
+DELETE FROM server_invites WHERE id = ?
+`
+
+func (q *Queries) DeleteInvite(ctx context.Context, id interface{}) error {
+	_, err := q.db.ExecContext(ctx, deleteInvite, id)
+	return err
+}
+
 const deleteMessage = `-- name: DeleteMessage :execrows
 DELETE FROM messages
 WHERE
@@ -178,6 +202,22 @@ type EditMessageParams struct {
 func (q *Queries) EditMessage(ctx context.Context, arg EditMessageParams) error {
 	_, err := q.db.ExecContext(ctx, editMessage, arg.Content, arg.ID)
 	return err
+}
+
+const getInvite = `-- name: GetInvite :one
+SELECT id, server_id, user_id, expires_at FROM server_invites WHERE id = ?
+`
+
+func (q *Queries) GetInvite(ctx context.Context, id interface{}) (ServerInvite, error) {
+	row := q.db.QueryRowContext(ctx, getInvite, id)
+	var i ServerInvite
+	err := row.Scan(
+		&i.ID,
+		&i.ServerID,
+		&i.UserID,
+		&i.ExpiresAt,
+	)
+	return i, err
 }
 
 const getMessageReactions = `-- name: GetMessageReactions :many
@@ -384,7 +424,7 @@ func (q *Queries) JoinServer(ctx context.Context, arg JoinServerParams) error {
 }
 
 const leaveServer = `-- name: LeaveServer :exec
-DELETE FROM server_members WHERE user_id = ? AND server_id = ?
+DELETE FROM server_members WHERE user_id = ? AND server_id = ? and is_ban = 0
 `
 
 type LeaveServerParams struct {

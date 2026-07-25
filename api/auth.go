@@ -10,7 +10,6 @@ import (
 
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
-	"github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -42,10 +41,8 @@ func (h *Handler) Register(c echo.Context) error {
 		Display:      req.Username,
 		PasswordHash: string(hash),
 	}); err != nil {
-		if extErr, ok := errors.AsType[*sqlite3.Error](err); ok {
-			if extErr.ExtendedCode == sqlite3.ErrConstraintUnique || extErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey {
-				return echo.NewHTTPError(http.StatusConflict, "Username already taken")
-			}
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "PRIMARY KEY constraint failed") {
+			return echo.NewHTTPError(http.StatusConflict, "Username already taken")
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
