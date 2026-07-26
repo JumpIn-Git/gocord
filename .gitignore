@@ -1,2 +1,3 @@
 /gocord
 .direnv
+.env

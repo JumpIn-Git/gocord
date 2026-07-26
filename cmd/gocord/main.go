@@ -58,14 +58,8 @@ func main() {
 		panic(err)
 	}
 
-	secret, err := os.ReadFile("auth.key")
-	if err != nil {
-		panic(err)
-	}
-	enc, err := os.ReadFile("enc.key")
-	if err != nil {
-		panic(err)
-	}
+	secret := []byte(os.Getenv("AUTH"))
+	enc := []byte(os.Getenv("ENC"))
 	store := sessions.NewCookieStore(secret, enc)
 	store.Options.Path = "/"
 	store.Options.HttpOnly = true
