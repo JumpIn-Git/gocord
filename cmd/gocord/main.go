@@ -2,10 +2,8 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"gocord/api"
 	"gocord/internal/core"
-	"log"
 	"os"
 	"time"
 
@@ -13,20 +11,24 @@ import (
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
+	"github.com/labstack/echo/v4"
 	"github.com/pressly/goose/v3"
 	"github.com/tursodatabase/go-libsql"
 )
 
 func main() {
+	e := echo.New()
+	logger := e.Logger
+
 	var db *sql.DB
 	primaryURL := os.Getenv("TURSO_DATABASE_URL")
 	authToken := os.Getenv("TURSO_AUTH_TOKEN")
 	if primaryURL == "" || authToken == "" {
-		log.Println("Missing TURSO credentials, using local file")
+		logger.Print("Missing TURSO credentials, using local file")
 		var err error
 		db, err = sql.Open("libsql", "file:local.db")
 		if err != nil {
-			panic(err)
+			logger.Fatal(err)
 		}
 	} else {
 		conn, err := libsql.NewEmbeddedReplicaConnector(
@@ -36,31 +38,34 @@ func main() {
 			libsql.WithReadYourWrites(true),
 		)
 		if err != nil {
-			panic(err)
+			logger.Fatal(err)
 		}
 		db = sql.OpenDB(conn)
 	}
 
 	if err := db.Ping(); err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
 	goose.SetBaseFS(migrations.Migrations)
 	if err := goose.SetDialect("sqlite3"); err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 	if err := goose.Up(db, "migrations"); err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
-	srv, err := core.NewServer(db, 1)
+	srv, err := core.NewServer(db, 1, e)
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
-	secret := []byte(os.Getenv("AUTH"))
-	enc := []byte(os.Getenv("ENC"))
-	store := sessions.NewCookieStore(secret, enc)
+	secret := os.Getenv("AUTH")
+	enc := os.Getenv("ENC")
+	if secret == "" || enc == "" {
+		logger.Fatal("AUTH and ENC environment variables must be set")
+	}
+	store := sessions.NewCookieStore([]byte(secret), []byte(enc))
 	store.Options.Path = "/"
 	store.Options.HttpOnly = true
 	store.Options.MaxAge = 60 * 60 * 24 // 1 day
@@ -79,14 +84,14 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	fmt.Printf("Listining on %s", port)
+	logger.Infof("Listining on %s", port)
 	go func() {
 		for {
 			time.Sleep(24 * time.Hour) // Dont run it often because we will also check expiry on invite usage
 			if err := srv.Q.DeleteExpiredInvites(srv.Context); err != nil {
-				srv.Logger.Error(err)
+				logger.Error(err)
 			}
 		}
 	}()
-	srv.Logger.Fatal(srv.Start(":" + port))
+	logger.Fatal(srv.Start(":" + port))
 }

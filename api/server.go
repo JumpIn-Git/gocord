@@ -47,6 +47,7 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		UserID:   UserID,
 		ServerID: req.Server,
 	}); err != nil {
+		h.Srv.Logger.Error(err)
 		return err
 	}
 	h.Srv.Hub.Joined <- core.UserJoined{

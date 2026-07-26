@@ -38,6 +38,7 @@ func (h *Handler) PostReaction(c echo.Context) error {
 		UserID:    UserID,
 		Emoji:     req.Emoji,
 	}); err != nil {
+		h.Srv.Logger.Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	h.Srv.Hub.Broadcast <- core.Event{

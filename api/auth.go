@@ -44,6 +44,7 @@ func (h *Handler) Register(c echo.Context) error {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "PRIMARY KEY constraint failed") {
 			return echo.NewHTTPError(http.StatusConflict, "Username already taken")
 		}
+		h.Srv.Logger.Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 

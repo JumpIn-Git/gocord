@@ -18,13 +18,13 @@ type Server struct {
 	Hub *Hub
 }
 
-func NewServer(db *sql.DB, flakeInt int64) (*Server, error) {
+func NewServer(db *sql.DB, flakeInt int64, echo *echo.Echo) (*Server, error) {
 	flake, err := snowflake.NewNode(flakeInt)
 	if err != nil {
 		return nil, err
 	}
 	return &Server{
-		Echo:    echo.New(),
+		Echo:    echo,
 		Q:       query.New(db),
 		Flake:   flake,
 		Context: context.Background(),

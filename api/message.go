@@ -82,6 +82,7 @@ func (h *Handler) PostMessage(c echo.Context) error {
 		ReplyTo:  sql.NullInt64{Int64: *req.ReplyTo, Valid: req.ReplyTo != nil},
 		IsReply:  req.ReplyTo != nil,
 	}); err != nil {
+		h.Srv.Logger.Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
