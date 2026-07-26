@@ -40,28 +40,33 @@ type UserLeft struct {
 	Server int64
 }
 
+type OnlineUser struct {
+	Servers map[int64]struct{}
+	Clients map[*Client]struct{}
+}
+
 // (using maps for 15+ items is faster than a slice, stuct{}{} is 0 bytes)
 type Hub struct {
-	Broadcast   chan Event
-	Servers     map[int64]map[int64]struct{}   // server ID -> online user IDs
-	Clients     map[int64]map[*Client]struct{} // user ID -> active WebSocket sessions
-	UserServers map[int64]map[int64]struct{}   // user ID -> server IDs they are member of
-	Login       chan LoginRequest
-	Logout      chan *Client
-	Joined      chan UserJoined
-	Left        chan UserLeft
+	Broadcast chan Event
+	Servers   map[int64]map[int64]struct{} // server ID -> online user IDs
+	Users     map[int64]*OnlineUser        // user ID -> active WebSocket sessions
+	// UserServers map[int64]map[int64]struct{}   // user ID -> server IDs they are member of
+	Login  chan LoginRequest
+	Logout chan *Client
+	Joined chan UserJoined
+	Left   chan UserLeft
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		Broadcast:   make(chan Event),
-		Servers:     make(map[int64]map[int64]struct{}),
-		Clients:     make(map[int64]map[*Client]struct{}),
-		UserServers: make(map[int64]map[int64]struct{}),
-		Login:       make(chan LoginRequest),
-		Logout:      make(chan *Client),
-		Joined:      make(chan UserJoined),
-		Left:        make(chan UserLeft),
+		Broadcast: make(chan Event),
+		Servers:   make(map[int64]map[int64]struct{}),
+		Users:     make(map[int64]*OnlineUser),
+		// UserServers: make(map[int64]map[int64]struct{}),
+		Login:  make(chan LoginRequest),
+		Logout: make(chan *Client),
+		Joined: make(chan UserJoined),
+		Left:   make(chan UserLeft),
 	}
 }
 
@@ -71,8 +76,8 @@ func (h *Hub) Run() {
 		case event := <-h.Broadcast:
 			if userIDs, ok := h.Servers[event.ServerID]; ok {
 				for userID := range userIDs {
-					if clients, ok := h.Clients[userID]; ok {
-						for client := range clients {
+					if user, ok := h.Users[userID]; ok {
+						for client := range user.Clients {
 							select {
 							case client.Send <- event:
 							default:
@@ -84,20 +89,20 @@ func (h *Hub) Run() {
 				}
 			}
 		case req := <-h.Login:
-			if _, ok := h.UserServers[req.Client.UserID]; !ok {
-				h.UserServers[req.Client.UserID] = make(map[int64]struct{})
+			if _, ok := h.Users[req.Client.UserID]; !ok {
+				h.Users[req.Client.UserID] = &OnlineUser{
+					Servers: make(map[int64]struct{}),
+					Clients: make(map[*Client]struct{}),
+				}
 				for _, id := range req.ServerIDs {
-					h.UserServers[req.Client.UserID][id] = struct{}{}
+					h.Users[req.Client.UserID].Servers[id] = struct{}{}
 					if _, ok := h.Servers[id]; !ok {
 						h.Servers[id] = make(map[int64]struct{})
 					}
 					h.Servers[id][req.Client.UserID] = struct{}{}
 				}
 			}
-			if _, ok := h.Clients[req.Client.UserID]; !ok {
-				h.Clients[req.Client.UserID] = make(map[*Client]struct{})
-			}
-			h.Clients[req.Client.UserID][req.Client] = struct{}{}
+			h.Users[req.Client.UserID].Clients[req.Client] = struct{}{}
 		case client := <-h.Logout:
 			h.removeClient(client)
 			close(client.Send)
@@ -106,8 +111,8 @@ func (h *Hub) Run() {
 				h.Servers[joined.Server] = make(map[int64]struct{})
 			}
 			h.Servers[joined.Server][joined.UserID] = struct{}{}
-			if userServers, ok := h.UserServers[joined.UserID]; ok {
-				userServers[joined.Server] = struct{}{}
+			if user, ok := h.Users[joined.UserID]; ok {
+				user.Servers[joined.Server] = struct{}{}
 			}
 		case left := <-h.Left:
 			if users, ok := h.Servers[left.Server]; ok {
@@ -116,11 +121,8 @@ func (h *Hub) Run() {
 					delete(h.Servers, left.Server)
 				}
 			}
-			if userServers, ok := h.UserServers[left.UserID]; ok {
-				delete(userServers, left.Server)
-				if len(userServers) == 0 {
-					delete(h.UserServers, left.UserID)
-				}
+			if user, ok := h.Users[left.UserID]; ok {
+				delete(user.Servers, left.Server)
 			}
 		}
 
@@ -128,20 +130,17 @@ func (h *Hub) Run() {
 }
 
 func (h *Hub) removeClient(client *Client) {
-	if clients, ok := h.Clients[client.UserID]; ok {
-		delete(clients, client)
-		if len(clients) == 0 { // last logged in session of account
-			delete(h.Clients, client.UserID)
-			if userServers, ok := h.UserServers[client.UserID]; ok {
-				for id := range userServers {
-					if users, ok := h.Servers[id]; ok {
-						delete(users, client.UserID)
-						if len(users) == 0 {
-							delete(h.Servers, id)
-						}
+	if user, ok := h.Users[client.UserID]; ok {
+		delete(user.Clients, client)
+		if len(user.Clients) == 0 { // last logged in session of account
+			delete(h.Users, client.UserID)
+			for serverID := range user.Servers {
+				if users, ok := h.Servers[serverID]; ok {
+					delete(users, client.UserID)
+					if len(users) == 0 {
+						delete(h.Servers, serverID)
 					}
 				}
-				delete(h.UserServers, client.UserID)
 			}
 		}
 	}
@@ -152,24 +151,22 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func (s *Server) HandleWebSocket(h *Hub) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		UserID := c.Get("user_id").(int64)
-		serverIDs, err := s.Q.GetUserServersIDs(c.Request().Context(), UserID)
-		if err != nil {
-			return c.String(http.StatusInternalServerError, "Failed to load servers")
-		}
-		conn, err := upgrader.Upgrade(c.Response().Writer, c.Request(), nil)
-		if err != nil {
-			return c.String(http.StatusInternalServerError, "Failed to upgrade connection")
-		}
-		client := &Client{
-			Conn:   conn,
-			UserID: UserID,
-			Send:   make(chan Event, 64),
-		}
-		h.Login <- LoginRequest{Client: client, ServerIDs: serverIDs}
-		go client.WritePump()
-		return nil
+func (s *Server) HandleWebSocket(c echo.Context) error {
+	UserID := c.Get("user_id").(int64)
+	serverIDs, err := s.Q.GetUserServersIDs(c.Request().Context(), UserID)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Failed to load servers")
 	}
+	conn, err := upgrader.Upgrade(c.Response().Writer, c.Request(), nil)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Failed to upgrade connection")
+	}
+	client := &Client{
+		Conn:   conn,
+		UserID: UserID,
+		Send:   make(chan Event, 64),
+	}
+	s.Hub.Login <- LoginRequest{Client: client, ServerIDs: serverIDs}
+	go client.WritePump()
+	return nil
 }

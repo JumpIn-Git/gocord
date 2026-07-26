@@ -31,6 +31,7 @@ func (h *Handler) Register(c echo.Context) error {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
+		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError
 	}
 
@@ -76,6 +77,7 @@ func (h *Handler) Login(c echo.Context) error {
 	if errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
 	} else if err != nil {
+		h.Srv.Logger.Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 

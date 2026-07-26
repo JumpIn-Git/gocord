@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"gocord/api"
+	"gocord/db/query"
 	"gocord/internal/core"
 	"os"
 	"time"
 
 	migrations "gocord/db"
 
+	"github.com/bwmarrin/snowflake"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -18,17 +21,16 @@ import (
 
 func main() {
 	e := echo.New()
-	logger := e.Logger
 
 	var db *sql.DB
 	primaryURL := os.Getenv("TURSO_DATABASE_URL")
 	authToken := os.Getenv("TURSO_AUTH_TOKEN")
 	if primaryURL == "" || authToken == "" {
-		logger.Print("Missing TURSO credentials, using local file")
+		e.Logger.Print("Missing TURSO credentials, using local file")
 		var err error
 		db, err = sql.Open("libsql", "file:local.db")
 		if err != nil {
-			logger.Fatal(err)
+			e.Logger.Fatal(err)
 		}
 	} else {
 		conn, err := libsql.NewEmbeddedReplicaConnector(
@@ -38,37 +40,46 @@ func main() {
 			libsql.WithReadYourWrites(true),
 		)
 		if err != nil {
-			logger.Fatal(err)
+			e.Logger.Fatal(err)
 		}
 		db = sql.OpenDB(conn)
 	}
 
 	if err := db.Ping(); err != nil {
-		logger.Fatal(err)
+		e.Logger.Fatal(err)
 	}
 
 	goose.SetBaseFS(migrations.Migrations)
 	if err := goose.SetDialect("sqlite3"); err != nil {
-		logger.Fatal(err)
+		e.Logger.Fatal(err)
 	}
 	if err := goose.Up(db, "migrations"); err != nil {
-		logger.Fatal(err)
+		e.Logger.Fatal(err)
 	}
 
-	srv, err := core.NewServer(db, 1, e)
+	flake, err := snowflake.NewNode(1)
 	if err != nil {
-		logger.Fatal(err)
+		e.Logger.Fatal(err)
+	}
+	srv := &core.Server{
+		Echo:    e,
+		Q:       query.New(db),
+		Flake:   flake,
+		Context: context.Background(),
+		Hub:     core.NewHub(),
 	}
 
-	secret := os.Getenv("AUTH")
+	auth := os.Getenv("AUTH")
 	enc := os.Getenv("ENC")
-	if secret == "" || enc == "" {
-		logger.Fatal("AUTH and ENC environment variables must be set")
+	if auth == "" || enc == "" {
+		e.Logger.Fatal("AUTH and ENC environment variables must be set")
 	}
-	store := sessions.NewCookieStore([]byte(secret), []byte(enc))
-	store.Options.Path = "/"
-	store.Options.HttpOnly = true
-	store.Options.MaxAge = 60 * 60 * 24 // 1 day
+	store := sessions.NewCookieStore([]byte(auth), []byte(enc))
+	store.Options = &sessions.Options{
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   60 * 60 * 24, // 1 day
+	}
 	srv.Echo.Use(session.Middleware(store))
 
 	go srv.Hub.Run()
@@ -77,21 +88,21 @@ func main() {
 		Srv: srv,
 	}
 
-	srv.GET("/ws", srv.HandleWebSocket(srv.Hub), core.AuthMiddleware)
+	srv.GET("/ws", srv.HandleWebSocket, core.AuthMiddleware)
 	apiHandler.Route(srv.Echo)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	logger.Infof("Listining on %s", port)
+	e.Logger.Infof("Listining on %s", port)
 	go func() {
 		for {
 			time.Sleep(24 * time.Hour) // Dont run it often because we will also check expiry on invite usage
 			if err := srv.Q.DeleteExpiredInvites(srv.Context); err != nil {
-				logger.Error(err)
+				e.Logger.Error(err)
 			}
 		}
 	}()
-	logger.Fatal(srv.Start(":" + port))
+	e.Logger.Fatal(srv.Start(":" + port))
 }

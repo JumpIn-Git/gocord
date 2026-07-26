@@ -20,7 +20,7 @@ SELECT * FROM users WHERE username = ? AND is_deleted = 0;
 SELECT server_id FROM server_members WHERE user_id = ? and is_ban = 0;
 
 -- name: UserInServer :one
-SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ?);
+SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ? and is_ban = 0);
 
 /* SERVERS */
 -- name: CreateServer :exec

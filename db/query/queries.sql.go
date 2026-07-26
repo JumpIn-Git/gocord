@@ -437,7 +437,7 @@ func (q *Queries) LeaveServer(ctx context.Context, arg LeaveServerParams) error 
 }
 
 const userInServer = `-- name: UserInServer :one
-SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ?)
+SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ? and is_ban = 0)
 `
 
 type UserInServerParams struct {

@@ -69,6 +69,7 @@ func (h *Handler) DeleteReaction(c echo.Context) error {
 		UserID:   UserID,
 		ServerID: req.ServerID,
 	}); err != nil {
+		h.Srv.Logger.Error(err)
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	} else if !ok {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")

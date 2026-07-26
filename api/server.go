@@ -25,9 +25,10 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		UserID:   UserID,
 		ServerID: req.Server,
 	}); err != nil {
+		h.Srv.Logger.Error(err)
 		return err
 	} else if ok {
-		return echo.NewHTTPError(200, "already in server or banned")
+		return echo.NewHTTPError(http.StatusForbidden, "already in server or banned")
 	}
 
 	invite, err := h.Srv.Q.GetInvite(c.Request().Context(), req.Invite)
@@ -35,20 +36,20 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		return err
 	}
 	if invite.ServerID != req.Server {
-		return echo.NewHTTPError(400, "invite does not match server")
+		return echo.NewHTTPError(http.StatusBadRequest, "invite does not match server")
 	}
 	if time.Now().Compare(invite.ExpiresAt) < 0 {
 		if err := h.Srv.Q.DeleteInvite(c.Request().Context(), req.Invite); err != nil {
 			c.Logger().Error(err)
 		}
-		return echo.NewHTTPError(400, "invite has expired")
+		return echo.NewHTTPError(http.StatusBadRequest, "invite has expired")
 	}
 	if err := h.Srv.Q.CreateMembership(c.Request().Context(), query.CreateMembershipParams{
 		UserID:   UserID,
 		ServerID: req.Server,
 	}); err != nil {
 		h.Srv.Logger.Error(err)
-		return err
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to join server")
 	}
 	h.Srv.Hub.Joined <- core.UserJoined{
 		UserID: UserID,
@@ -71,8 +72,9 @@ func (h *Handler) LeaveServer(c echo.Context) error {
 		ServerID: req.Server,
 	}); err != nil {
 		if err == sql.ErrNoRows {
-			return echo.NewHTTPError(404, "not found")
+			return echo.NewHTTPError(http.StatusNotFound, "not in server")
 		}
+		h.Srv.Logger.Error(err)
 		return err
 	}
 	h.Srv.Hub.Left <- core.UserLeft{
