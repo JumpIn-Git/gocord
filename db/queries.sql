@@ -17,7 +17,7 @@ WHERE
 SELECT * FROM users WHERE username = ? AND is_deleted = 0;
 
 -- name: GetUserServersIDs :many
-SELECT server_id FROM server_members WHERE user_id = ?;
+SELECT server_id FROM server_members WHERE user_id = ? and is_ban = 0;
 
 -- name: UserInServer :one
 SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ?);

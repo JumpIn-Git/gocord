@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"gocord/db/query"
+	"gocord/internal/core"
 	"net/http"
 	"time"
 
@@ -48,6 +49,10 @@ func (h *Handler) JoinServer(c echo.Context) error {
 	}); err != nil {
 		return err
 	}
+	h.Srv.Hub.Joined <- core.UserJoined{
+		UserID: UserID,
+		Server: req.Server,
+	}
 	return c.JSON(http.StatusOK, nil)
 }
 
@@ -68,6 +73,10 @@ func (h *Handler) LeaveServer(c echo.Context) error {
 			return echo.NewHTTPError(404, "not found")
 		}
 		return err
+	}
+	h.Srv.Hub.Left <- core.UserLeft{
+		UserID: UserID,
+		Server: req.Server,
 	}
 	return c.JSON(http.StatusOK, nil)
 }

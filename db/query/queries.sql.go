@@ -19,7 +19,6 @@ type CreateMembershipParams struct {
 	ServerID int64
 }
 
-// MEMBERSHIP
 func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipParams) error {
 	_, err := q.db.ExecContext(ctx, createMembership, arg.UserID, arg.ServerID)
 	return err
@@ -383,7 +382,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getUserServersIDs = `-- name: GetUserServersIDs :many
-SELECT server_id FROM server_members WHERE user_id = ?
+SELECT server_id FROM server_members WHERE user_id = ? and is_ban = 0
 `
 
 func (q *Queries) GetUserServersIDs(ctx context.Context, userID int64) ([]int64, error) {
