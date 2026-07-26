@@ -18,7 +18,7 @@ func (h *Handler) PostReaction(c echo.Context) error {
 		Emoji     string `json:"emoji"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
 	if _, err := gomoji.GetInfo(req.Emoji); err != nil {
@@ -29,7 +29,8 @@ func (h *Handler) PostReaction(c echo.Context) error {
 		UserID:   UserID,
 		ServerID: req.ServerID,
 	}); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	} else if !ok {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
@@ -39,7 +40,7 @@ func (h *Handler) PostReaction(c echo.Context) error {
 		Emoji:     req.Emoji,
 	}); err != nil {
 		h.Srv.Logger.Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return echo.ErrInternalServerError
 	}
 	h.Srv.Hub.Broadcast <- core.Event{
 		Type:     "new_reaction",
@@ -49,7 +50,6 @@ func (h *Handler) PostReaction(c echo.Context) error {
 	return c.JSON(http.StatusOK, nil)
 }
 
-// /api/servers/{server}/react/{message} DELETE
 func (h *Handler) DeleteReaction(c echo.Context) error {
 	UserID := c.Get("user_id").(int64)
 	var req struct {
@@ -58,7 +58,7 @@ func (h *Handler) DeleteReaction(c echo.Context) error {
 		Emoji     string `json:"emoji"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
 	if _, err := gomoji.GetInfo(req.Emoji); err != nil {
@@ -70,7 +70,7 @@ func (h *Handler) DeleteReaction(c echo.Context) error {
 		ServerID: req.ServerID,
 	}); err != nil {
 		h.Srv.Logger.Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return echo.ErrInternalServerError
 	} else if !ok {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
@@ -79,7 +79,8 @@ func (h *Handler) DeleteReaction(c echo.Context) error {
 		UserID:    UserID,
 		Emoji:     req.Emoji,
 	}); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	} else if n == 0 {
 		return echo.NewHTTPError(http.StatusNotFound, "reaction not found")
 	}

@@ -18,7 +18,7 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		Invite string `json:"invite"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
 	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
@@ -26,21 +26,22 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		ServerID: req.Server,
 	}); err != nil {
 		h.Srv.Logger.Error(err)
-		return err
+		return echo.ErrInternalServerError
 	} else if ok {
 		return echo.NewHTTPError(http.StatusForbidden, "already in server or banned")
 	}
 
 	invite, err := h.Srv.Q.GetInvite(c.Request().Context(), req.Invite)
 	if err != nil {
-		return err
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	}
 	if invite.ServerID != req.Server {
 		return echo.NewHTTPError(http.StatusBadRequest, "invite does not match server")
 	}
 	if time.Now().Compare(invite.ExpiresAt) < 0 {
 		if err := h.Srv.Q.DeleteInvite(c.Request().Context(), req.Invite); err != nil {
-			c.Logger().Error(err)
+			h.Srv.Logger.Error(err)
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, "invite has expired")
 	}
@@ -49,7 +50,7 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		ServerID: req.Server,
 	}); err != nil {
 		h.Srv.Logger.Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to join server")
+		return echo.ErrInternalServerError
 	}
 	h.Srv.Hub.Joined <- core.UserJoined{
 		UserID: UserID,
@@ -64,7 +65,7 @@ func (h *Handler) LeaveServer(c echo.Context) error {
 		Server int64 `param:"server"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
 	if err := h.Srv.Q.LeaveServer(c.Request().Context(), query.LeaveServerParams{
@@ -75,7 +76,7 @@ func (h *Handler) LeaveServer(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusNotFound, "not in server")
 		}
 		h.Srv.Logger.Error(err)
-		return err
+		return echo.ErrInternalServerError
 	}
 	h.Srv.Hub.Left <- core.UserLeft{
 		UserID: UserID,

@@ -16,14 +16,15 @@ func (h *Handler) GetMessages(c echo.Context) error {
 		Offset int64 `param:"offset"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
 	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: req.Server,
 	}); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	} else if !ok {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
@@ -34,7 +35,8 @@ func (h *Handler) GetMessages(c echo.Context) error {
 		Offset:   req.Offset,
 	})
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	}
 	if len(messages) == 0 {
 		return c.NoContent(http.StatusNoContent)
@@ -47,17 +49,18 @@ func (h *Handler) PostMessage(c echo.Context) error {
 	var req struct {
 		Server  int64  `param:"server"`
 		Content string `json:"content"`
-		ReplyTo *int64 `json:"reply_to,omitempty,string"` // optional message id from string
+		ReplyTo *int64 `json:"reply_to,omitempty,string"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
 	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: req.Server,
 	}); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	} else if !ok {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
@@ -71,7 +74,7 @@ func (h *Handler) PostMessage(c echo.Context) error {
 		IsReply:  req.ReplyTo != nil,
 	}); err != nil {
 		h.Srv.Logger.Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return echo.ErrInternalServerError
 	}
 
 	h.Srv.Hub.Broadcast <- core.Event{
@@ -89,14 +92,15 @@ func (h *Handler) DeleteMessage(c echo.Context) error {
 		MessageID int64 `param:"message"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return err
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
 	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
 		ServerID: req.Server,
 	}); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	} else if !ok {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
@@ -105,7 +109,8 @@ func (h *Handler) DeleteMessage(c echo.Context) error {
 		ID:     req.MessageID,
 		UserID: UserID,
 	}); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	} else if n == 0 {
 		return echo.NewHTTPError(http.StatusNotFound, "you are not authorized or message not found")
 	}

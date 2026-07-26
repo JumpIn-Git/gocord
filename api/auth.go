@@ -46,16 +46,18 @@ func (h *Handler) Register(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusConflict, "Username already taken")
 		}
 		h.Srv.Logger.Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return echo.ErrInternalServerError
 	}
 
 	sess, err := session.Get("gocord", c)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	}
 	sess.Values["user_id"] = id
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{
@@ -78,7 +80,7 @@ func (h *Handler) Login(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
 	} else if err != nil {
 		h.Srv.Logger.Error(err)
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		return echo.ErrInternalServerError
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
@@ -87,11 +89,13 @@ func (h *Handler) Login(c echo.Context) error {
 
 	sess, err := session.Get("gocord", c)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	}
 	sess.Values["user_id"] = user.ID
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{
@@ -103,13 +107,14 @@ func (h *Handler) Login(c echo.Context) error {
 func (h *Handler) Logout(c echo.Context) error {
 	sess, err := session.Get("gocord", c)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	}
 	sess.Values = make(map[any]any)
-	sess.Options.MaxAge = -1 // browser will remove the cookie
-	// TODO add cookie_ver to sqlite users to make old cookies useless
+	sess.Options.MaxAge = -1
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		h.Srv.Logger.Error(err)
+		return echo.ErrInternalServerError
 	}
 	return c.JSON(http.StatusOK, nil)
 }
