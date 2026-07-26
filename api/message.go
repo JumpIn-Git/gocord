@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"net/http"
 
 	"gocord/db/query"
@@ -15,9 +14,6 @@ func (h *Handler) GetMessages(c echo.Context) error {
 	var req struct {
 		Server int64 `param:"server"`
 		Offset int64 `param:"offset"`
-	}
-	if err := c.Bind(&req); err != nil {
-		return err
 	}
 	if err := c.Bind(&req); err != nil {
 		return err
@@ -48,38 +44,30 @@ func (h *Handler) GetMessages(c echo.Context) error {
 
 func (h *Handler) PostMessage(c echo.Context) error {
 	UserID := c.Get("user_id").(int64)
-
-	var params struct {
-		Server int64 `param:"server"`
+	var req struct {
+		Server  int64  `param:"server"`
+		Content string `json:"content"`
+		ReplyTo *int64 `json:"reply_to,omitempty,string"` // optional message id from string
 	}
-	if err := c.Bind(&params); err != nil {
-		return err
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
 	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
 		UserID:   UserID,
-		ServerID: params.Server,
+		ServerID: req.Server,
 	}); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	} else if !ok {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
-	var req struct {
-		Content string `json:"content"`
-		ReplyTo *int64 `json:"reply_to,omitempty,string"`
-	}
-
-	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-
 	if err := h.Srv.Q.CreateMessage(c.Request().Context(), query.CreateMessageParams{
 		ID:       h.Srv.Flake.Generate().Int64(),
-		ServerID: params.Server,
+		ServerID: req.Server,
 		UserID:   UserID,
 		Content:  req.Content,
-		ReplyTo:  sql.NullInt64{Int64: *req.ReplyTo, Valid: req.ReplyTo != nil},
+		ReplyTo:  req.ReplyTo,
 		IsReply:  req.ReplyTo != nil,
 	}); err != nil {
 		h.Srv.Logger.Error(err)
@@ -88,7 +76,7 @@ func (h *Handler) PostMessage(c echo.Context) error {
 
 	h.Srv.Hub.Broadcast <- core.Event{
 		Type:     "new_msg",
-		ServerID: params.Server,
+		ServerID: req.Server,
 		Payload:  req,
 	}
 	return c.NoContent(http.StatusOK)

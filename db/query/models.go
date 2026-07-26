@@ -5,53 +5,52 @@
 package query
 
 import (
-	"database/sql"
 	"time"
 )
 
 type Message struct {
-	ID       int64
-	ServerID int64
-	UserID   int64
-	Content  string
-	ReplyTo  sql.NullInt64
-	IsReply  bool
-	IsEdited bool
-	Time     time.Time
+	ID       int64     `json:"id"`
+	ServerID int64     `json:"server_id"`
+	UserID   int64     `json:"user_id"`
+	Content  string    `json:"content"`
+	ReplyTo  *int64    `json:"reply_to"`
+	IsReply  bool      `json:"is_reply"`
+	IsEdited bool      `json:"is_edited"`
+	Time     time.Time `json:"time"`
 }
 
 type MessageReaction struct {
-	MessageID int64
-	UserID    int64
-	Emoji     string
+	MessageID int64  `json:"message_id"`
+	UserID    int64  `json:"user_id"`
+	Emoji     string `json:"emoji"`
 }
 
 type Server struct {
-	ID    int64
-	Name  string
-	Owner int64
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Owner int64  `json:"owner"`
 }
 
 type ServerInvite struct {
-	ID        interface{}
-	ServerID  int64
-	UserID    int64
-	ExpiresAt time.Time
+	ID        interface{} `json:"id"`
+	ServerID  int64       `json:"server_id"`
+	UserID    int64       `json:"user_id"`
+	ExpiresAt time.Time   `json:"expires_at"`
 }
 
 type ServerMember struct {
-	ServerID      int64
-	UserID        int64
-	IsBan         bool
-	ServerDisplay sql.NullString
+	ServerID      int64   `json:"server_id"`
+	UserID        int64   `json:"user_id"`
+	IsBan         bool    `json:"is_ban"`
+	ServerDisplay *string `json:"server_display"`
 }
 
 type User struct {
-	ID           int64
-	Username     string
-	Display      string
-	PasswordHash string
-	JoinedAt     time.Time
-	IsDeleted    bool
-	CookieVer    int64
+	ID           int64     `json:"id"`
+	Username     string    `json:"username"`
+	Display      string    `json:"display"`
+	PasswordHash string    `json:"password_hash"`
+	JoinedAt     time.Time `json:"joined_at"`
+	IsDeleted    bool      `json:"is_deleted"`
+	CookieVer    int64     `json:"cookie_ver"`
 }

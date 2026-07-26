@@ -7,7 +7,6 @@ package query
 
 import (
 	"context"
-	"database/sql"
 )
 
 const createMembership = `-- name: CreateMembership :exec
@@ -15,8 +14,8 @@ INSERT INTO server_members(user_id, server_id) VALUES (?, ?)
 `
 
 type CreateMembershipParams struct {
-	UserID   int64
-	ServerID int64
+	UserID   int64 `json:"user_id"`
+	ServerID int64 `json:"server_id"`
 }
 
 func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipParams) error {
@@ -30,12 +29,12 @@ VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type CreateMessageParams struct {
-	ID       int64
-	ServerID int64
-	UserID   int64
-	Content  string
-	ReplyTo  sql.NullInt64
-	IsReply  bool
+	ID       int64  `json:"id"`
+	ServerID int64  `json:"server_id"`
+	UserID   int64  `json:"user_id"`
+	Content  string `json:"content"`
+	ReplyTo  *int64 `json:"reply_to"`
+	IsReply  bool   `json:"is_reply"`
 }
 
 // MESSAGES
@@ -56,9 +55,9 @@ INSERT INTO message_reactions(message_id, user_id, emoji) VALUES (?, ?, ?)
 `
 
 type CreateReactionParams struct {
-	MessageID int64
-	UserID    int64
-	Emoji     string
+	MessageID int64  `json:"message_id"`
+	UserID    int64  `json:"user_id"`
+	Emoji     string `json:"emoji"`
 }
 
 // REACTIONS
@@ -72,9 +71,9 @@ INSERT INTO servers(id, name, owner) VALUES (?, ?, ?)
 `
 
 type CreateServerParams struct {
-	ID    int64
-	Name  string
-	Owner int64
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	Owner int64  `json:"owner"`
 }
 
 // SERVERS
@@ -88,10 +87,10 @@ INSERT INTO users(id, username, display, password_hash) VALUES (?, ?, ?, ?)
 `
 
 type CreateUserParams struct {
-	ID           int64
-	Username     string
-	Display      string
-	PasswordHash string
+	ID           int64  `json:"id"`
+	Username     string `json:"username"`
+	Display      string `json:"display"`
+	PasswordHash string `json:"password_hash"`
 }
 
 // USERS
@@ -133,8 +132,8 @@ WHERE
 `
 
 type DeleteMessageParams struct {
-	ID     int64
-	UserID int64
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
 }
 
 func (q *Queries) DeleteMessage(ctx context.Context, arg DeleteMessageParams) (int64, error) {
@@ -150,9 +149,9 @@ DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?
 `
 
 type DeleteReactionParams struct {
-	MessageID int64
-	UserID    int64
-	Emoji     string
+	MessageID int64  `json:"message_id"`
+	UserID    int64  `json:"user_id"`
+	Emoji     string `json:"emoji"`
 }
 
 func (q *Queries) DeleteReaction(ctx context.Context, arg DeleteReactionParams) (int64, error) {
@@ -194,8 +193,8 @@ UPDATE messages SET content = ?, is_edited = 1 WHERE id = ?
 `
 
 type EditMessageParams struct {
-	Content string
-	ID      int64
+	Content string `json:"content"`
+	ID      int64  `json:"id"`
 }
 
 func (q *Queries) EditMessage(ctx context.Context, arg EditMessageParams) error {
@@ -262,9 +261,9 @@ SELECT server_id, user_id, is_ban, server_display FROM server_members WHERE serv
 `
 
 type GetServerMembersParams struct {
-	ServerID int64
-	Limit    int64
-	Offset   int64
+	ServerID int64 `json:"server_id"`
+	Limit    int64 `json:"limit"`
+	Offset   int64 `json:"offset"`
 }
 
 func (q *Queries) GetServerMembers(ctx context.Context, arg GetServerMembersParams) ([]ServerMember, error) {
@@ -300,8 +299,8 @@ SELECT id, server_id, user_id, content, reply_to, is_reply, is_edited, time FROM
 `
 
 type GetServerMessageParams struct {
-	ServerID int64
-	ID       int64
+	ServerID int64 `json:"server_id"`
+	ID       int64 `json:"id"`
 }
 
 func (q *Queries) GetServerMessage(ctx context.Context, arg GetServerMessageParams) (Message, error) {
@@ -325,9 +324,9 @@ SELECT id, server_id, user_id, content, reply_to, is_reply, is_edited, time FROM
 `
 
 type GetServerMessagesParams struct {
-	ServerID int64
-	Limit    int64
-	Offset   int64
+	ServerID int64 `json:"server_id"`
+	Limit    int64 `json:"limit"`
+	Offset   int64 `json:"offset"`
 }
 
 func (q *Queries) GetServerMessages(ctx context.Context, arg GetServerMessagesParams) ([]Message, error) {
@@ -413,8 +412,8 @@ INSERT INTO server_members(user_id, server_id) VALUES (?, ?)
 `
 
 type JoinServerParams struct {
-	UserID   int64
-	ServerID int64
+	UserID   int64 `json:"user_id"`
+	ServerID int64 `json:"server_id"`
 }
 
 func (q *Queries) JoinServer(ctx context.Context, arg JoinServerParams) error {
@@ -427,8 +426,8 @@ DELETE FROM server_members WHERE user_id = ? AND server_id = ? and is_ban = 0
 `
 
 type LeaveServerParams struct {
-	UserID   int64
-	ServerID int64
+	UserID   int64 `json:"user_id"`
+	ServerID int64 `json:"server_id"`
 }
 
 func (q *Queries) LeaveServer(ctx context.Context, arg LeaveServerParams) error {
@@ -441,8 +440,8 @@ SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ? 
 `
 
 type UserInServerParams struct {
-	UserID   int64
-	ServerID int64
+	UserID   int64 `json:"user_id"`
+	ServerID int64 `json:"server_id"`
 }
 
 func (q *Queries) UserInServer(ctx context.Context, arg UserInServerParams) (bool, error) {
