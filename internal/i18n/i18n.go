@@ -30,64 +30,35 @@ func init() {
 	}
 }
 
-type ErrorCode int
+type ErrorCode string
 
 const (
-	ErrInvalidBody ErrorCode = iota + 1
-	ErrUsernamePasswordRequired
-	ErrUsernamePasswordTooLong
-	ErrUsernameTaken
-	ErrInvalidCredentials
-	ErrAlreadyInServer
-	ErrInviteMismatch
-	ErrInviteExpired
-	ErrInvalidDuration
-	ErrOwnerOnlyInvite
-	ErrUserNotInServer
-	ErrNotAuthorized
-	ErrContentRequired
-	ErrMessageNotFound
-	ErrInvalidEmoji
-	ErrReactionNotFound
-	ErrUnauthorized
+	ErrInvalidBody              ErrorCode = "ErrInvalidBody"
+	ErrUsernamePasswordRequired ErrorCode = "ErrUsernamePasswordRequired"
+	ErrUsernamePasswordTooLong  ErrorCode = "ErrUsernamePasswordTooLong"
+	ErrUsernameTaken            ErrorCode = "ErrUsernameTaken"
+	ErrInvalidCredentials       ErrorCode = "ErrInvalidCredentials"
+	ErrAlreadyInServer          ErrorCode = "ErrAlreadyInServer"
+	ErrInviteMismatch           ErrorCode = "ErrInviteMismatch"
+	ErrInviteExpired            ErrorCode = "ErrInviteExpired"
+	ErrInvalidDuration          ErrorCode = "ErrInvalidDuration"
+	ErrOwnerOnlyInvite          ErrorCode = "ErrOwnerOnlyInvite"
+	ErrUserNotInServer          ErrorCode = "ErrUserNotInServer"
+	ErrNotAuthorized            ErrorCode = "ErrNotAuthorized"
+	ErrContentRequired          ErrorCode = "ErrContentRequired"
+	ErrMessageNotFound          ErrorCode = "ErrMessageNotFound"
+	ErrInvalidEmoji             ErrorCode = "ErrInvalidEmoji"
+	ErrReactionNotFound         ErrorCode = "ErrReactionNotFound"
+	ErrUnauthorized             ErrorCode = "ErrUnauthorized"
 )
 
-var codeNames = map[ErrorCode]string{
-	ErrInvalidBody:              "ErrInvalidBody",
-	ErrUsernamePasswordRequired: "ErrUsernamePasswordRequired",
-	ErrUsernamePasswordTooLong:  "ErrUsernamePasswordTooLong",
-	ErrUsernameTaken:            "ErrUsernameTaken",
-	ErrInvalidCredentials:       "ErrInvalidCredentials",
-	ErrAlreadyInServer:          "ErrAlreadyInServer",
-	ErrInviteMismatch:           "ErrInviteMismatch",
-	ErrInviteExpired:            "ErrInviteExpired",
-	ErrInvalidDuration:          "ErrInvalidDuration",
-	ErrOwnerOnlyInvite:          "ErrOwnerOnlyInvite",
-	ErrUserNotInServer:          "ErrUserNotInServer",
-	ErrNotAuthorized:            "ErrNotAuthorized",
-	ErrContentRequired:          "ErrContentRequired",
-	ErrMessageNotFound:          "ErrMessageNotFound",
-	ErrInvalidEmoji:             "ErrInvalidEmoji",
-	ErrReactionNotFound:         "ErrReactionNotFound",
-	ErrUnauthorized:             "ErrUnauthorized",
-}
-
 const defaultLang = "en"
-
-var supported = map[string]bool{
-	"en": true,
-	"nl": true,
-}
-
-func (c ErrorCode) String() string {
-	return codeNames[c]
-}
 
 func Msg(c echo.Context, code ErrorCode) string {
 	lang := c.QueryParam("lang")
 	accept := c.Request().Header.Get("Accept-Language")
 	localizer := i18n.NewLocalizer(bundle, lang, accept)
-	msg, err := localizer.Localize(&i18n.LocalizeConfig{MessageID: code.String()})
+	msg, err := localizer.Localize(&i18n.LocalizeConfig{MessageID: string(code)})
 	if err != nil {
 		c.Logger().Error(err)
 		return "Unknown error"
