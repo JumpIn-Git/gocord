@@ -3,6 +3,7 @@ package api
 import (
 	"gocord/db/query"
 	"gocord/internal/core"
+	"gocord/internal/i18n"
 	"net/http"
 
 	"github.com/forPelevin/gomoji"
@@ -18,15 +19,15 @@ func (h *Handler) PostReaction(c echo.Context) error {
 		Emoji     string `json:"emoji"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInvalidBody))
 	}
 
 	if _, err := gomoji.GetInfo(req.Emoji); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInvalidEmoji))
 	}
 
 	if !h.Srv.Hub.IsUserInServer(UserID, req.ServerID) {
-		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
+		return echo.NewHTTPError(http.StatusForbidden, i18n.Msg(c, i18n.ErrUserNotInServer))
 	}
 	if err := h.Srv.Q.CreateReaction(c.Request().Context(), query.CreateReactionParams{
 		MessageID: req.MessageID,
@@ -52,15 +53,15 @@ func (h *Handler) DeleteReaction(c echo.Context) error {
 		Emoji     string `json:"emoji"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInvalidBody))
 	}
 
 	if _, err := gomoji.GetInfo(req.Emoji); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInvalidEmoji))
 	}
 
 	if !h.Srv.Hub.IsUserInServer(UserID, req.ServerID) {
-		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
+		return echo.NewHTTPError(http.StatusForbidden, i18n.Msg(c, i18n.ErrUserNotInServer))
 	}
 	if n, err := h.Srv.Q.DeleteReaction(c.Request().Context(), query.DeleteReactionParams{
 		MessageID: req.MessageID,
@@ -70,7 +71,7 @@ func (h *Handler) DeleteReaction(c echo.Context) error {
 		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError
 	} else if n == 0 {
-		return echo.NewHTTPError(http.StatusNotFound, "reaction not found")
+		return echo.NewHTTPError(http.StatusNotFound, i18n.Msg(c, i18n.ErrReactionNotFound))
 	}
 	h.Srv.Hub.Broadcast <- core.Event{
 		Type:     "del_reaction",

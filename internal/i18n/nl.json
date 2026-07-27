@@ -1,0 +1,19 @@
+{
+  "ErrInvalidBody": "Ongeldige aanvraaginhoud",
+  "ErrUsernamePasswordRequired": "Gebruikersnaam en wachtwoord vereist",
+  "ErrUsernamePasswordTooLong": "Gebruikersnaam en wachtwoord maximaal 32 tekens",
+  "ErrUsernameTaken": "Gebruikersnaam al in gebruik",
+  "ErrInvalidCredentials": "Ongeldige inloggegevens",
+  "ErrAlreadyInServer": "Al in server of verbannen",
+  "ErrInviteMismatch": "Uitnodiging komt niet overeen met server",
+  "ErrInviteExpired": "Uitnodiging is verlopen",
+  "ErrInvalidDuration": "Ongeldige duur",
+  "ErrOwnerOnlyInvite": "Alleen de servereigenaar kan niet-vervallende uitnodigingen maken",
+  "ErrUserNotInServer": "Gebruiker niet in server",
+  "ErrNotAuthorized": "Niet geautoriseerd of bericht niet gevonden",
+  "ErrContentRequired": "Inhoud is vereist",
+  "ErrMessageNotFound": "Bericht niet gevonden of niet uw bericht",
+  "ErrInvalidEmoji": "Ongeldige emoji",
+  "ErrReactionNotFound": "Reactie niet gevonden",
+  "ErrUnauthorized": "Niet geautoriseerd"
+}

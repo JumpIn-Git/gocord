@@ -1,0 +1,19 @@
+{
+  "ErrInvalidBody": "Invalid request body",
+  "ErrUsernamePasswordRequired": "Username and password required",
+  "ErrUsernamePasswordTooLong": "Username and password must be 32 characters or less",
+  "ErrUsernameTaken": "Username already taken",
+  "ErrInvalidCredentials": "Invalid credentials",
+  "ErrAlreadyInServer": "Already in server or banned",
+  "ErrInviteMismatch": "Invite does not match server",
+  "ErrInviteExpired": "Invite has expired",
+  "ErrInvalidDuration": "Invalid duration",
+  "ErrOwnerOnlyInvite": "Only the server owner can make invites that never expire",
+  "ErrUserNotInServer": "User not in server",
+  "ErrNotAuthorized": "Not authorized or message not found",
+  "ErrContentRequired": "Content is required",
+  "ErrMessageNotFound": "Message not found or not your message",
+  "ErrInvalidEmoji": "Invalid emoji",
+  "ErrReactionNotFound": "Reaction not found",
+  "ErrUnauthorized": "Unauthorized"
+}

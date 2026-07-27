@@ -52,6 +52,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 }
 
 const createReaction = `-- name: CreateReaction :exec
+
 INSERT INTO message_reactions(message_id, user_id, emoji) VALUES (?, ?, ?)
 `
 
@@ -61,6 +62,7 @@ type CreateReactionParams struct {
 	Emoji     string `json:"emoji"`
 }
 
+// Server owner can delete any message
 // REACTIONS
 func (q *Queries) CreateReaction(ctx context.Context, arg CreateReactionParams) error {
 	_, err := q.db.ExecContext(ctx, createReaction, arg.MessageID, arg.UserID, arg.Emoji)
@@ -191,18 +193,22 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 	return err
 }
 
-const editMessage = `-- name: EditMessage :exec
-UPDATE messages SET content = ?, is_edited = 1 WHERE id = ?
+const editMessage = `-- name: EditMessage :execrows
+UPDATE messages SET content = ?, is_edited = 1 WHERE id = ? AND user_id = ?
 `
 
 type EditMessageParams struct {
 	Content string `json:"content"`
 	ID      int64  `json:"id"`
+	UserID  int64  `json:"user_id"`
 }
 
-func (q *Queries) EditMessage(ctx context.Context, arg EditMessageParams) error {
-	_, err := q.db.ExecContext(ctx, editMessage, arg.Content, arg.ID)
-	return err
+func (q *Queries) EditMessage(ctx context.Context, arg EditMessageParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, editMessage, arg.Content, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const getInvite = `-- name: GetInvite :one
@@ -408,6 +414,15 @@ func (q *Queries) GetUserServersIDs(ctx context.Context, userID int64) ([]int64,
 		return nil, err
 	}
 	return items, nil
+}
+
+const incCookieVer = `-- name: IncCookieVer :exec
+UPDATE users SET cookie_ver = cookie_ver + 1 WHERE id = ?
+`
+
+func (q *Queries) IncCookieVer(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, incCookieVer, id)
+	return err
 }
 
 const isOwner = `-- name: IsOwner :one

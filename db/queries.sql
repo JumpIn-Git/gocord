@@ -30,6 +30,9 @@ SELECT
       AND is_ban = 0
   );
 
+-- name: IncCookieVer :exec
+UPDATE users SET cookie_ver = cookie_ver + 1 WHERE id = ?;
+
 /* SERVERS */
 -- name: CreateServer :exec
 INSERT INTO servers(id, name, owner) VALUES (?, ?, ?);
@@ -66,14 +69,14 @@ SELECT * FROM messages WHERE server_id = ? ORDER BY id LIMIT ? OFFSET ?;
 -- name: GetServerMessage :one
 SELECT * FROM messages WHERE server_id = ? AND id = ?;
 
--- name: EditMessage :exec
-UPDATE messages SET content = ?, is_edited = 1 WHERE id = ?;
+-- name: EditMessage :execrows
+UPDATE messages SET content = ?, is_edited = 1 WHERE id = ? AND user_id = ?;
 
 -- name: DeleteMessage :execrows
 DELETE FROM messages
 WHERE
   messages.id = ?1
-  AND (user_id = ?2 OR server_id IN (SELECT id FROM servers WHERE owner = ?2));
+  AND (user_id = ?2 OR server_id IN (SELECT id FROM servers WHERE owner = ?2)); -- Server owner can delete any message
 
 /* REACTIONS */
 -- name: CreateReaction :exec

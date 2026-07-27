@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"gocord/db/query"
 	"gocord/internal/core"
+	"gocord/internal/i18n"
 	"net/http"
 	"time"
 
@@ -18,11 +19,11 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		Invite string `json:"invite"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInvalidBody))
 	}
 
 	if h.Srv.Hub.IsUserInServer(UserID, req.Server) {
-		return echo.NewHTTPError(http.StatusForbidden, "already in server or banned")
+		return echo.NewHTTPError(http.StatusForbidden, i18n.Msg(c, i18n.ErrAlreadyInServer))
 	}
 
 	invite, err := h.Srv.Q.GetInvite(c.Request().Context(), req.Invite)
@@ -31,13 +32,13 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 	if invite.ServerID != req.Server {
-		return echo.NewHTTPError(http.StatusBadRequest, "invite does not match server")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInviteMismatch))
 	}
 	if time.Now().Compare(*invite.ExpiresAt) < 0 {
 		if err := h.Srv.Q.DeleteInvite(c.Request().Context(), req.Invite); err != nil {
 			h.Srv.Logger.Error(err)
 		}
-		return echo.NewHTTPError(http.StatusBadRequest, "invite has expired")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInviteExpired))
 	}
 	if err := h.Srv.Q.CreateMembership(c.Request().Context(), query.CreateMembershipParams{
 		UserID:   UserID,
@@ -59,7 +60,7 @@ func (h *Handler) LeaveServer(c echo.Context) error {
 		Server int64 `param:"server"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInvalidBody))
 	}
 
 	if err := h.Srv.Q.LeaveServer(c.Request().Context(), query.LeaveServerParams{
@@ -67,7 +68,7 @@ func (h *Handler) LeaveServer(c echo.Context) error {
 		ServerID: req.Server,
 	}); err != nil {
 		if err == sql.ErrNoRows {
-			return echo.NewHTTPError(http.StatusNotFound, "not in server")
+			return echo.NewHTTPError(http.StatusNotFound, i18n.Msg(c, i18n.ErrUserNotInServer))
 		}
 		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError

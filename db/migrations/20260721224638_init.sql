@@ -6,7 +6,7 @@ CREATE TABLE users (
   password_hash TEXT NOT NULL,
   joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_deleted BOOLEAN NOT NULL DEFAULT 0,
-  cookie_ver INTEGER NOT NULL DEFAULT 0
+  cookie_ver INTEGER NOT NULL DEFAULT 0 -- increment on security events (like a password change or logging out all devices)
 );
 
 CREATE TABLE servers (

@@ -60,6 +60,15 @@ A Discord-like chat server built with Go, using [Echo](https://echo.labstack.com
 
 All routes except register/login require a valid session cookie.
 
+### Localization
+
+API error messages can be localized by passing a `?lang` query parameter with an ISO 639-1 language code (e.g. `?lang=nl`). If omitted, the `Accept-Language` header is used instead. Falls back to English if neither matches a supported locale.
+
+| Language | Code |
+| -------- | ---- |
+| English  | `en` |
+| Dutch    | `nl` |
+
 ## Running
 
 ```sh

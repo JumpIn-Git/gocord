@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/rand"
 	"gocord/db/query"
+	"gocord/internal/i18n"
 	"math/big"
 	"net/http"
 	"time"
@@ -39,7 +40,7 @@ func (h *Handler) PostInvite(c echo.Context) error {
 	case "never":
 		duration = 0
 	default:
-		return echo.NewHTTPError(400, "invalid duration")
+		return echo.NewHTTPError(400, i18n.Msg(c, i18n.ErrInvalidDuration))
 	}
 
 	UserID := c.Get("user_id").(int64)
@@ -52,7 +53,7 @@ func (h *Handler) PostInvite(c echo.Context) error {
 			h.Srv.Logger.Error(err)
 			return err
 		} else if !ok {
-			return echo.NewHTTPError(403, "only the server owner can make invites that never expire")
+			return echo.NewHTTPError(403, i18n.Msg(c, i18n.ErrOwnerOnlyInvite))
 		}
 	}
 

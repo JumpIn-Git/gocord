@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"gocord/db/query"
+	"gocord/internal/i18n"
 
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
@@ -19,14 +20,14 @@ func (h *Handler) Register(c echo.Context) error {
 		Password string `json:"password"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInvalidBody))
 	}
 	req.Username = strings.TrimSpace(req.Username)
 	if req.Username == "" || req.Password == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "username and password required")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrUsernamePasswordRequired))
 	}
 	if len(req.Username) > 32 || len(req.Password) > 32 {
-		return echo.NewHTTPError(http.StatusBadRequest, "username and password must be 32 characters or less")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrUsernamePasswordTooLong))
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -43,7 +44,7 @@ func (h *Handler) Register(c echo.Context) error {
 		PasswordHash: string(hash),
 	}); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "PRIMARY KEY constraint failed") {
-			return echo.NewHTTPError(http.StatusConflict, "Username already taken")
+			return echo.NewHTTPError(http.StatusConflict, i18n.Msg(c, i18n.ErrUsernameTaken))
 		}
 		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError
@@ -73,19 +74,19 @@ func (h *Handler) Login(c echo.Context) error {
 		Password string `json:"password"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
+		return echo.NewHTTPError(http.StatusBadRequest, i18n.Msg(c, i18n.ErrInvalidBody))
 	}
 
 	user, err := h.Srv.Q.GetUserByUsername(c.Request().Context(), req.Username)
 	if errors.Is(err, sql.ErrNoRows) {
-		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
+		return echo.NewHTTPError(http.StatusUnauthorized, i18n.Msg(c, i18n.ErrInvalidCredentials))
 	} else if err != nil {
 		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, "invalid credentials")
+		return echo.NewHTTPError(http.StatusUnauthorized, i18n.Msg(c, i18n.ErrInvalidCredentials))
 	}
 
 	sess, err := session.Get("gocord", c)

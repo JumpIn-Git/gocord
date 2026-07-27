@@ -1,3 +1,1 @@
 schema = ["db/migrations/*.sql"]
-[format]
-# line-width = 40
