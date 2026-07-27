@@ -83,7 +83,7 @@ go run .
 TURSO_DATABASE_URL=libsql://... TURSO_AUTH_TOKEN=... go run .
 ```
 
-Needs `auth.key` and `enc.key` in the working directory (64 bytes each, for gorilla/sessions).
+Needs `ENC` and `AUTH` environment variables (32 and 64 bytes respectively, for gorilla/sessions).
 
 ## IDs
 
