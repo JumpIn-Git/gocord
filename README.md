@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> Still WIP, no front-end and active development
+
 # gocord
 
 A Discord-like chat server built with Go, using [Echo](https://echo.labstack.com/) for HTTP and WebSocket for real-time messaging.
