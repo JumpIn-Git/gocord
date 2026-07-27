@@ -35,7 +35,7 @@ type ServerInvite struct {
 	ID        interface{} `json:"id"`
 	ServerID  int64       `json:"server_id"`
 	UserID    int64       `json:"user_id"`
-	ExpiresAt time.Time   `json:"expires_at"`
+	ExpiresAt *time.Time  `json:"expires_at"`
 }
 
 type ServerMember struct {

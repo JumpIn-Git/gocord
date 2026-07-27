@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 )
 
@@ -14,14 +15,16 @@ type Event struct {
 }
 
 type Client struct {
-	Conn   *websocket.Conn
-	UserID int64
-	Send   chan Event
+	Conn         *websocket.Conn
+	UserID       int64
+	SessionToken int64
+	Send         chan Event
 }
 
 type LoginRequest struct {
-	Client    *Client
-	ServerIDs []int64
+	Client       *Client
+	ServerIDs    []int64
+	SessionToken int64
 }
 
 func (c *Client) WritePump() {
@@ -45,28 +48,41 @@ type OnlineUser struct {
 	Clients map[*Client]struct{}
 }
 
+type checkUserInServerRequest struct {
+	UserID   int64
+	ServerID int64
+	Result   chan bool
+}
+
+type disconnectRequest struct {
+	UserID       int64
+	SessionToken int64
+}
+
 // (using maps for 15+ items is faster than a slice, stuct{}{} is 0 bytes)
 type Hub struct {
-	Broadcast chan Event
-	Servers   map[int64]map[int64]struct{} // server ID -> online user IDs
-	Users     map[int64]*OnlineUser        // user ID -> active WebSocket sessions
-	// UserServers map[int64]map[int64]struct{}   // user ID -> server IDs they are member of
-	Login  chan LoginRequest
-	Logout chan *Client
-	Joined chan UserJoined
-	Left   chan UserLeft
+	Broadcast         chan Event
+	Servers           map[int64]map[int64]struct{} // server ID -> online user IDs
+	Users             map[int64]*OnlineUser        // user ID -> active WebSocket sessions and servers
+	Login             chan LoginRequest            // client logged into account
+	Logout            chan *Client                 // client logged out of account
+	Joined            chan UserJoined
+	Left              chan UserLeft
+	checkUserInServer chan checkUserInServerRequest
+	disconnectUser    chan disconnectRequest
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		Broadcast: make(chan Event),
-		Servers:   make(map[int64]map[int64]struct{}),
-		Users:     make(map[int64]*OnlineUser),
-		// UserServers: make(map[int64]map[int64]struct{}),
-		Login:  make(chan LoginRequest),
-		Logout: make(chan *Client),
-		Joined: make(chan UserJoined),
-		Left:   make(chan UserLeft),
+		Broadcast:         make(chan Event),
+		Servers:           make(map[int64]map[int64]struct{}),
+		Users:             make(map[int64]*OnlineUser),
+		Login:             make(chan LoginRequest),
+		Logout:            make(chan *Client),
+		Joined:            make(chan UserJoined),
+		Left:              make(chan UserLeft),
+		checkUserInServer: make(chan checkUserInServerRequest),
+		disconnectUser:    make(chan disconnectRequest),
 	}
 }
 
@@ -124,9 +140,37 @@ func (h *Hub) Run() {
 			if user, ok := h.Users[left.UserID]; ok {
 				delete(user.Servers, left.Server)
 			}
+		case req := <-h.checkUserInServer:
+			user, ok := h.Users[req.UserID]
+			if !ok {
+				req.Result <- false
+			} else {
+				_, ok = user.Servers[req.ServerID]
+				req.Result <- ok
+			}
+		case req := <-h.disconnectUser:
+			if user, ok := h.Users[req.UserID]; ok {
+				for client := range user.Clients {
+					if client.SessionToken == req.SessionToken {
+						h.removeClient(client)
+						close(client.Send)
+						client.Conn.Close()
+					}
+				}
+			}
 		}
 
 	}
+}
+
+func (h *Hub) IsUserInServer(userID, serverID int64) bool {
+	ch := make(chan bool)
+	h.checkUserInServer <- checkUserInServerRequest{UserID: userID, ServerID: serverID, Result: ch}
+	return <-ch
+}
+
+func (h *Hub) Disconnect(userID, sessionToken int64) {
+	h.disconnectUser <- disconnectRequest{UserID: userID, SessionToken: sessionToken}
 }
 
 func (h *Hub) removeClient(client *Client) {
@@ -153,20 +197,30 @@ var upgrader = websocket.Upgrader{
 
 func (s *Server) HandleWebSocket(c echo.Context) error {
 	UserID := c.Get("user_id").(int64)
-	serverIDs, err := s.Q.GetUserServersIDs(c.Request().Context(), UserID)
+	sess, err := session.Get("gocord", c)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "Failed to load servers")
+		return c.String(http.StatusInternalServerError, "Failed to get session")
 	}
+	token, _ := sess.Values["session_token"].(int64)
 	conn, err := upgrader.Upgrade(c.Response().Writer, c.Request(), nil)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, "Failed to upgrade connection")
 	}
 	client := &Client{
-		Conn:   conn,
-		UserID: UserID,
-		Send:   make(chan Event, 64),
+		Conn:         conn,
+		UserID:       UserID,
+		SessionToken: token,
+		Send:         make(chan Event, 64),
 	}
-	s.Hub.Login <- LoginRequest{Client: client, ServerIDs: serverIDs}
+
+	var serverIDs []int64
+	if _, ok := s.Hub.Users[UserID]; !ok { // first logged in session of account, load server IDs from database
+		serverIDs, err = s.Q.GetUserServersIDs(c.Request().Context(), UserID)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "Failed to load servers")
+		}
+	}
+	s.Hub.Login <- LoginRequest{Client: client, ServerIDs: serverIDs, SessionToken: token}
 	go client.WritePump()
 	return nil
 }

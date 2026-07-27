@@ -21,13 +21,7 @@ func (h *Handler) JoinServer(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
-	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
-		UserID:   UserID,
-		ServerID: req.Server,
-	}); err != nil {
-		h.Srv.Logger.Error(err)
-		return echo.ErrInternalServerError
-	} else if ok {
+	if h.Srv.Hub.IsUserInServer(UserID, req.Server) {
 		return echo.NewHTTPError(http.StatusForbidden, "already in server or banned")
 	}
 
@@ -39,7 +33,7 @@ func (h *Handler) JoinServer(c echo.Context) error {
 	if invite.ServerID != req.Server {
 		return echo.NewHTTPError(http.StatusBadRequest, "invite does not match server")
 	}
-	if time.Now().Compare(invite.ExpiresAt) < 0 {
+	if time.Now().Compare(*invite.ExpiresAt) < 0 {
 		if err := h.Srv.Q.DeleteInvite(c.Request().Context(), req.Invite); err != nil {
 			h.Srv.Logger.Error(err)
 		}

@@ -7,6 +7,7 @@ package query
 
 import (
 	"context"
+	"time"
 )
 
 const createMembership = `-- name: CreateMembership :exec
@@ -105,7 +106,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 }
 
 const deleteExpiredInvites = `-- name: DeleteExpiredInvites :exec
-DELETE FROM server_invites WHERE expires_at <= datetime('now')
+DELETE FROM server_invites WHERE
+  expires_at IS NOT NULL
+  AND expires_at <= datetime('now')
 `
 
 // INVITES
@@ -381,7 +384,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const getUserServersIDs = `-- name: GetUserServersIDs :many
-SELECT server_id FROM server_members WHERE user_id = ? and is_ban = 0
+SELECT server_id FROM server_members WHERE user_id = ? AND is_ban = 0
 `
 
 func (q *Queries) GetUserServersIDs(ctx context.Context, userID int64) ([]int64, error) {
@@ -407,6 +410,22 @@ func (q *Queries) GetUserServersIDs(ctx context.Context, userID int64) ([]int64,
 	return items, nil
 }
 
+const isOwner = `-- name: IsOwner :one
+SELECT EXISTS (SELECT 1 FROM servers WHERE id = ? AND owner = ?)
+`
+
+type IsOwnerParams struct {
+	ID    int64 `json:"id"`
+	Owner int64 `json:"owner"`
+}
+
+func (q *Queries) IsOwner(ctx context.Context, arg IsOwnerParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, isOwner, arg.ID, arg.Owner)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const joinServer = `-- name: JoinServer :exec
 INSERT INTO server_members(user_id, server_id) VALUES (?, ?)
 `
@@ -422,7 +441,7 @@ func (q *Queries) JoinServer(ctx context.Context, arg JoinServerParams) error {
 }
 
 const leaveServer = `-- name: LeaveServer :exec
-DELETE FROM server_members WHERE user_id = ? AND server_id = ? and is_ban = 0
+DELETE FROM server_members WHERE user_id = ? AND server_id = ? AND is_ban = 0
 `
 
 type LeaveServerParams struct {
@@ -435,8 +454,38 @@ func (q *Queries) LeaveServer(ctx context.Context, arg LeaveServerParams) error 
 	return err
 }
 
+const makeInvite = `-- name: MakeInvite :exec
+INSERT INTO server_invites(id, server_id, user_id, expires_at)
+VALUES (?, ?, ?, ?)
+`
+
+type MakeInviteParams struct {
+	ID        interface{} `json:"id"`
+	ServerID  int64       `json:"server_id"`
+	UserID    int64       `json:"user_id"`
+	ExpiresAt *time.Time  `json:"expires_at"`
+}
+
+func (q *Queries) MakeInvite(ctx context.Context, arg MakeInviteParams) error {
+	_, err := q.db.ExecContext(ctx, makeInvite,
+		arg.ID,
+		arg.ServerID,
+		arg.UserID,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
 const userInServer = `-- name: UserInServer :one
-SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ? and is_ban = 0)
+SELECT
+  EXISTS (
+    SELECT 1
+    FROM server_members
+    WHERE
+      user_id = ?
+      AND server_id = ?
+      AND is_ban = 0
+  )
 `
 
 type UserInServerParams struct {

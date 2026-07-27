@@ -17,10 +17,18 @@ WHERE
 SELECT * FROM users WHERE username = ? AND is_deleted = 0;
 
 -- name: GetUserServersIDs :many
-SELECT server_id FROM server_members WHERE user_id = ? and is_ban = 0;
+SELECT server_id FROM server_members WHERE user_id = ? AND is_ban = 0;
 
 -- name: UserInServer :one
-SELECT EXISTS (SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ? and is_ban = 0);
+SELECT
+  EXISTS (
+    SELECT 1
+    FROM server_members
+    WHERE
+      user_id = ?
+      AND server_id = ?
+      AND is_ban = 0
+  );
 
 /* SERVERS */
 -- name: CreateServer :exec
@@ -33,7 +41,7 @@ DELETE FROM servers WHERE id = ?;
 INSERT INTO server_members(user_id, server_id) VALUES (?, ?);
 
 -- name: LeaveServer :exec
-DELETE FROM server_members WHERE user_id = ? AND server_id = ? and is_ban = 0;
+DELETE FROM server_members WHERE user_id = ? AND server_id = ? AND is_ban = 0;
 
 -- name: GetServerMembers :many
 SELECT * FROM server_members WHERE server_id = ? LIMIT ? OFFSET ?;
@@ -43,6 +51,9 @@ SELECT COUNT(*) FROM server_members WHERE server_id = ?;
 
 -- name: CreateMembership :exec
 INSERT INTO server_members(user_id, server_id) VALUES (?, ?);
+
+-- name: IsOwner :one
+SELECT EXISTS (SELECT 1 FROM servers WHERE id = ? AND owner = ?);
 
 /* MESSAGES */
 -- name: CreateMessage :exec
@@ -77,10 +88,16 @@ DELETE FROM message_reactions WHERE message_id = ? AND user_id = ? AND emoji = ?
 /* INVITES */
 -- name: DeleteExpiredInvites :exec
 -- Run this periodically to delete expired invites
-DELETE FROM server_invites WHERE expires_at <= datetime('now');
+DELETE FROM server_invites WHERE
+  expires_at IS NOT NULL
+  AND expires_at <= datetime('now');
 
 -- name: GetInvite :one
 SELECT * FROM server_invites WHERE id = ?;
 
 -- name: DeleteInvite :exec
 DELETE FROM server_invites WHERE id = ?;
+
+-- name: MakeInvite :exec
+INSERT INTO server_invites(id, server_id, user_id, expires_at)
+VALUES (?, ?, ?, ?);

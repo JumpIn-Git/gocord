@@ -31,7 +31,7 @@ CREATE TABLE server_invites (
   id string PRIMARY KEY,
   server_id INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
-  expires_at TIMESTAMP NOT NULL,
+  expires_at TIMESTAMP, -- can be null, no expiration
   FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

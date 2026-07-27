@@ -55,6 +55,7 @@ func (h *Handler) Register(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 	sess.Values["user_id"] = id
+	sess.Values["session_token"] = h.Srv.Flake.Generate().Int64()
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
 		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError
@@ -93,6 +94,7 @@ func (h *Handler) Login(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 	sess.Values["user_id"] = user.ID
+	sess.Values["session_token"] = h.Srv.Flake.Generate().Int64()
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
 		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError
@@ -110,11 +112,18 @@ func (h *Handler) Logout(c echo.Context) error {
 		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError
 	}
+	userID, _ := sess.Values["user_id"].(int64)
+	token, _ := sess.Values["session_token"].(int64)
+
 	sess.Values = make(map[any]any)
-	sess.Options.MaxAge = -1
+	sess.Options.MaxAge = -1 // browser will delete the cookie
 	if err := sess.Save(c.Request(), c.Response()); err != nil {
 		h.Srv.Logger.Error(err)
 		return echo.ErrInternalServerError
+	}
+
+	if userID != 0 {
+		h.Srv.Hub.Disconnect(userID, token)
 	}
 	return c.JSON(http.StatusOK, nil)
 }

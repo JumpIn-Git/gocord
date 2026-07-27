@@ -25,13 +25,7 @@ func (h *Handler) PostReaction(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
-		UserID:   UserID,
-		ServerID: req.ServerID,
-	}); err != nil {
-		h.Srv.Logger.Error(err)
-		return echo.ErrInternalServerError
-	} else if !ok {
+	if !h.Srv.Hub.IsUserInServer(UserID, req.ServerID) {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 	if err := h.Srv.Q.CreateReaction(c.Request().Context(), query.CreateReactionParams{
@@ -65,13 +59,7 @@ func (h *Handler) DeleteReaction(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
-		UserID:   UserID,
-		ServerID: req.ServerID,
-	}); err != nil {
-		h.Srv.Logger.Error(err)
-		return echo.ErrInternalServerError
-	} else if !ok {
+	if !h.Srv.Hub.IsUserInServer(UserID, req.ServerID) {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 	if n, err := h.Srv.Q.DeleteReaction(c.Request().Context(), query.DeleteReactionParams{

@@ -19,13 +19,7 @@ func (h *Handler) GetMessages(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
-	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
-		UserID:   UserID,
-		ServerID: req.Server,
-	}); err != nil {
-		h.Srv.Logger.Error(err)
-		return echo.ErrInternalServerError
-	} else if !ok {
+	if !h.Srv.Hub.IsUserInServer(UserID, req.Server) {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
@@ -55,13 +49,7 @@ func (h *Handler) PostMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
-	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
-		UserID:   UserID,
-		ServerID: req.Server,
-	}); err != nil {
-		h.Srv.Logger.Error(err)
-		return echo.ErrInternalServerError
-	} else if !ok {
+	if !h.Srv.Hub.IsUserInServer(UserID, req.Server) {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
@@ -95,13 +83,7 @@ func (h *Handler) DeleteMessage(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid body")
 	}
 
-	if ok, err := h.Srv.Q.UserInServer(c.Request().Context(), query.UserInServerParams{
-		UserID:   UserID,
-		ServerID: req.Server,
-	}); err != nil {
-		h.Srv.Logger.Error(err)
-		return echo.ErrInternalServerError
-	} else if !ok {
+	if !h.Srv.Hub.IsUserInServer(UserID, req.Server) {
 		return echo.NewHTTPError(http.StatusForbidden, "user not in server")
 	}
 
