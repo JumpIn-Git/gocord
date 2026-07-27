@@ -15,7 +15,28 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "syntaqlite": "syntaqlite"
+      }
+    },
+    "syntaqlite": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1783503987,
+        "narHash": "sha256-v+QRu8fgafryp4jN9lAxZybe6r1MKRxn0xolx9GYKXA=",
+        "owner": "lalitmaganti",
+        "repo": "syntaqlite",
+        "rev": "3621e6420dcef547b2be439d8321687d32c4510b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "lalitmaganti",
+        "repo": "syntaqlite",
+        "type": "github"
       }
     }
   },
